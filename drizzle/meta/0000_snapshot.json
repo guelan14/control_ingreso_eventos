@@ -1,0 +1,190 @@
+{
+  "version": "6",
+  "dialect": "sqlite",
+  "id": "3bb19b78-9ec0-47bd-bcbc-9284407ffb86",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "tables": {
+    "invitados": {
+      "name": "invitados",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "nombre_apellido": {
+          "name": "nombre_apellido",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "rubro": {
+          "name": "rubro",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "empresa": {
+          "name": "empresa",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "cargo": {
+          "name": "cargo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "confirmacion": {
+          "name": "confirmacion",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "premiado": {
+          "name": "premiado",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "sector": {
+          "name": "sector",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "checkin_en": {
+          "name": "checkin_en",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "clave_unica": {
+          "name": "clave_unica",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "creado_en": {
+          "name": "creado_en",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(unixepoch('subsec') * 1000)"
+        },
+        "actualizado_en": {
+          "name": "actualizado_en",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(unixepoch('subsec') * 1000)"
+        }
+      },
+      "indexes": {
+        "invitados_clave_unica_idx": {
+          "name": "invitados_clave_unica_idx",
+          "columns": [
+            "clave_unica"
+          ],
+          "isUnique": true
+        },
+        "invitados_checkin_idx": {
+          "name": "invitados_checkin_idx",
+          "columns": [
+            "checkin_en"
+          ],
+          "isUnique": false
+        },
+        "invitados_rubro_idx": {
+          "name": "invitados_rubro_idx",
+          "columns": [
+            "rubro"
+          ],
+          "isUnique": false
+        },
+        "invitados_premiado_idx": {
+          "name": "invitados_premiado_idx",
+          "columns": [
+            "premiado"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "invitados_rubro_rubros_nombre_fk": {
+          "name": "invitados_rubro_rubros_nombre_fk",
+          "tableFrom": "invitados",
+          "tableTo": "rubros",
+          "columnsFrom": [
+            "rubro"
+          ],
+          "columnsTo": [
+            "nombre"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "rubros": {
+      "name": "rubros",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "nombre": {
+          "name": "nombre",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "rubros_nombre_unique": {
+          "name": "rubros_nombre_unique",
+          "columns": [
+            "nombre"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    }
+  },
+  "views": {},
+  "enums": {},
+  "_meta": {
+    "schemas": {},
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
+    "indexes": {}
+  }
+}
