@@ -39,3 +39,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# base de datos local
+/data/*
+!/data/.gitkeep
+
+# permitir el ejemplo de variables de entorno
+!.env.example
