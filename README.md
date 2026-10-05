@@ -3,6 +3,8 @@
 Sistema web para registrar el ingreso de invitados a eventos presenciales, alertar cuando ingresa un
 **premiado** y ver estadísticas en vivo. Proyecto de pasantía — Misiones Online 2026.
 
+**Autores:** Miguel Ángel Neumann · Dana Fleita
+
 > Propuesta técnica y decisiones de diseño: [`docs/PROPUESTA.md`](docs/PROPUESTA.md)
 
 ## Stack

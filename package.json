@@ -39,5 +39,9 @@
   },
   "engines": {
     "node": ">=24"
-  }
+  },
+  "contributors": [
+    "Miguel Ángel Neumann",
+    "Dana Fleita"
+  ]
 }

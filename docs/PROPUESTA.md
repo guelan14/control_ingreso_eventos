@@ -1,6 +1,6 @@
 # Propuesta técnica — Sistema de Control de Ingreso a Eventos
 
-Pasante: Miguel Ángel Neumann · Primer avance (Semana 1) · Octubre 2026
+Pasantes: Miguel Ángel Neumann y Dana Fleita · Primer avance (Semana 1) · Octubre 2026
 
 ## 1. Stack propuesto y justificación
 
