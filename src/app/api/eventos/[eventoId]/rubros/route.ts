@@ -1,9 +1,12 @@
+import { autorizarApi } from "@/lib/auth/dal";
 import { agregarRubro, nuevoRubroSchema, RubroDuplicadoError } from "@/lib/eventos/eventos";
 import { buscarEvento } from "@/lib/eventos/buscar";
 import { leerJson, respuestaError, respuestaErrorInterno, respuestaValidacion } from "@/lib/http";
 
 /** POST /api/eventos/:id/rubros — { nombre } */
 export async function POST(request: Request, ctx: RouteContext<"/api/eventos/[eventoId]/rubros">) {
+  const sesion = await autorizarApi(request, "eventos:gestionar");
+  if (sesion instanceof Response) return sesion;
   const cuerpo = await leerJson(request);
   if (cuerpo instanceof Response) return cuerpo;
   const datos = nuevoRubroSchema.safeParse(cuerpo);

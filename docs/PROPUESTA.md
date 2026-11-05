@@ -25,6 +25,27 @@ Pasantes: Miguel Ángel Neumann y Dana Fleita · Actualizada en noviembre de 202
 
 Unicidad dentro de cada evento: el DNI cuando está cargado; nombre + empresa cuando no. Así se aceptan homónimos con DNI distinto (D4).
 
+**usuarios**: `id`, `usuario` (único, sin email: el personal de puerta puede no tener), `nombre`, `clave_hash`, `rol`, `activo`, `debe_cambiar_clave`, `intentos_fallidos`, `bloqueado_hasta`, `ultimo_ingreso`.
+
+**sesiones**: `id` (hash del token de la cookie), `usuario_id`, `expira_en`.
+
+## 3 bis. Usuarios y roles (C1)
+
+Roles según quién usa cada pantalla (D3, D8, D11):
+
+| Rol | Quién | Puede |
+| --- | --- | --- |
+| Administrador | Sistemas / responsable | Todo, incluida la gestión de usuarios |
+| Organizador | Organización y equipo de invitaciones | Eventos, rubros, importación, lista; luego panel y descargas |
+| Recepción | Personal de la puerta | Ver eventos y buscar invitados; luego registrar ingresos |
+
+- **Sesiones en la base**, no un token firmado: se pueden cerrar desde el servidor (al desactivar a alguien o si se pierde un celular). Duran 12 horas, una jornada de evento.
+- **Contraseñas con scrypt** (incluido en Node). Las asigna el administrador como temporales y cada uno elige la suya al ingresar.
+- **Bloqueo** de 15 minutos tras 5 intentos fallidos. El mismo mensaje para usuario inexistente y contraseña incorrecta.
+- **Permisos en un solo archivo** y controlados en cada pantalla, endpoint y acción del servidor. El proxy solo redirige al login si no hay cookie.
+- **Primer administrador** por terminal (`npm run usuario:crear`), no desde una pantalla abierta: en un servidor publicado, cualquiera podría crearlo primero.
+- Pendiente para la revisión de seguridad: límite de intentos por IP (conviene en el proxy inverso del entorno) y registro de auditoría de acciones.
+
 ## 3. Decisiones de diseño (importación)
 
 - **Previsualizar → confirmar**: el Excel se valida primero y se muestra un reporte fila por fila; recién se graba al confirmar.
@@ -51,7 +72,7 @@ El cambio se hizo antes de construir el check-in, cuando solo afectaba la capa d
 ## 5. Buenas prácticas aplicadas
 
 - Lógica de negocio separada de la API y de la UI (`src/lib`), con funciones puras testeables.
-- 35 tests automáticos (validación, importación, reimportación, DNI, eventos, filtros, límites de archivo).
+- 56 tests automáticos (validación, importación, reimportación, DNI, eventos, filtros, límites de archivo, login, sesiones, bloqueo, permisos).
 - CI en GitHub Actions: lint + typecheck + tests + build en cada push.
 - Errores de API con formato uniforme; errores internos se loguean y no exponen detalles.
 - Consultas parametrizadas (sin inyección SQL); listado paginado.
@@ -68,7 +89,7 @@ El cambio se hizo antes de construir el check-in, cuando solo afectaba la capa d
 | Importación con validación fila por fila, plantilla por evento | ✅ |
 | Correcciones del Análisis #1: A1, A2 (parcial, con DNI), A4, A5 (paginado), M1, M4 | ✅ |
 | Alta de eventos y rubros (API y pantalla) | ✅ |
-| Login con usuarios y roles (C1) | Siguiente |
+| Login con usuarios y roles (C1) | ✅ |
 | Check-in con tabla de registros, doble ingreso y alerta de premiado (C2) | Siguiente |
 | Panel, gestión, QR, alta en puerta con acompañante | Pendiente |
 | Respaldo local (notebook espejo) | Pendiente |

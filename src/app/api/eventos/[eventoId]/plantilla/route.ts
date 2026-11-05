@@ -1,12 +1,15 @@
+import { autorizarApi } from "@/lib/auth/dal";
 import { buscarEvento } from "@/lib/eventos/buscar";
 import { respuestaError, respuestaErrorInterno } from "@/lib/http";
 import { crearLibroInvitados } from "@/lib/importacion/plantilla";
 
 /** GET /api/eventos/:id/plantilla — Excel vacío con las columnas y rubros de este evento. */
 export async function GET(
-  _request: Request,
+  request: Request,
   ctx: RouteContext<"/api/eventos/[eventoId]/plantilla">,
 ) {
+  const sesion = await autorizarApi(request, "invitados:importar");
+  if (sesion instanceof Response) return sesion;
   try {
     const encontrado = await buscarEvento((await ctx.params).eventoId);
     if (!encontrado) return respuestaError(404, "Evento no encontrado.");

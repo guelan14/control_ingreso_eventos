@@ -1,8 +1,10 @@
 import { notFound } from "next/navigation";
+import { requerirSesion } from "@/lib/auth/dal";
 import { buscarEvento } from "@/lib/eventos/buscar";
 import { FormularioImportacion } from "./formulario-importacion";
 
 export default async function Importar({ params }: PageProps<"/eventos/[eventoId]/importar">) {
+  await requerirSesion("invitados:importar");
   const encontrado = await buscarEvento((await params).eventoId);
   if (!encontrado) notFound();
   const { evento } = encontrado;

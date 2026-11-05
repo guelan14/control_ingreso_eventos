@@ -1,3 +1,4 @@
+import { autorizarApi } from "@/lib/auth/dal";
 import { buscarEvento } from "@/lib/eventos/buscar";
 import { respuestaError, respuestaErrorInterno } from "@/lib/http";
 import { importarInvitados } from "@/lib/importacion/importar";
@@ -11,6 +12,8 @@ const MAX_MB = Number(process.env.IMPORT_MAX_MB ?? 5);
  *   confirmar: "true" para grabar. Sin él solo valida y devuelve el reporte (previsualización).
  */
 export async function POST(request: Request, ctx: RouteContext<"/api/eventos/[eventoId]/import">) {
+  const sesion = await autorizarApi(request, "invitados:importar");
+  if (sesion instanceof Response) return sesion;
   let form: FormData;
   try {
     form = await request.formData();

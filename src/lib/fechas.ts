@@ -14,3 +14,15 @@ export function formatearHora(instante: Date | string): string {
     minute: "2-digit",
   }).format(new Date(instante));
 }
+
+/** "15/04/2027 18:30" en hora de Argentina. */
+export function formatearFechaHora(instante: Date | string): string {
+  return new Intl.DateTimeFormat("es-AR", {
+    timeZone: ZONA_HORARIA,
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(instante));
+}

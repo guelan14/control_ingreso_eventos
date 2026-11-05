@@ -1,15 +1,20 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { requerirSesion } from "@/lib/auth/dal";
+import { puede } from "@/lib/auth/roles";
 import { buscarEvento } from "@/lib/eventos/buscar";
 import { formatearFecha } from "@/lib/fechas";
 
 export default async function DetalleEvento({ params }: PageProps<"/eventos/[eventoId]">) {
+  const sesion = await requerirSesion("eventos:ver");
   const encontrado = await buscarEvento((await params).eventoId);
   if (!encontrado) notFound();
   const { evento } = encontrado;
 
   const acciones = [
-    { href: `/eventos/${evento.id}/importar`, titulo: "Importar invitados", detalle: "Excel con validación previa" },
+    ...(puede(sesion.rol, "invitados:importar")
+      ? [{ href: `/eventos/${evento.id}/importar`, titulo: "Importar invitados", detalle: "Excel con validación previa" }]
+      : []),
     { href: `/eventos/${evento.id}/invitados`, titulo: "Lista de invitados", detalle: "Buscar y filtrar" },
   ];
 

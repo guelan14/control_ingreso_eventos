@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { autorizarApi } from "@/lib/auth/dal";
 import { buscarEvento } from "@/lib/eventos/buscar";
 import { respuestaError, respuestaErrorInterno, respuestaValidacion } from "@/lib/http";
 import { filtrosInvitadosSchema, listarInvitados } from "@/lib/invitados/listar";
@@ -11,6 +12,8 @@ export async function GET(
   request: NextRequest,
   ctx: RouteContext<"/api/eventos/[eventoId]/invitados">,
 ) {
+  const sesion = await autorizarApi(request, "invitados:ver");
+  if (sesion instanceof Response) return sesion;
   const filtros = filtrosInvitadosSchema.safeParse(Object.fromEntries(request.nextUrl.searchParams));
   if (!filtros.success) return respuestaValidacion(filtros.error);
 

@@ -1,24 +1,30 @@
 import Link from "next/link";
-import { connection } from "next/server";
 import { getDb } from "@/db/client";
+import { requerirSesion } from "@/lib/auth/dal";
+import { puede } from "@/lib/auth/roles";
 import { listarEventos } from "@/lib/eventos/eventos";
 import { formatearFecha } from "@/lib/fechas";
 
 export default async function Inicio() {
-  await connection();
+  const sesion = await requerirSesion("eventos:ver");
+  const gestiona = puede(sesion.rol, "eventos:gestionar");
   const eventos = await listarEventos(await getDb());
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">Eventos</h1>
-        <Link href="/eventos/nuevo" className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white">
-          Nuevo evento
-        </Link>
+        {gestiona && (
+          <Link href="/eventos/nuevo" className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white">
+            Nuevo evento
+          </Link>
+        )}
       </div>
 
       {eventos.length === 0 ? (
-        <p className="text-slate-600">Todavía no hay eventos. Cree el primero para cargar invitados.</p>
+        <p className="text-slate-600">
+          {gestiona ? "Todavía no hay eventos. Cree el primero para cargar invitados." : "Todavía no hay eventos cargados."}
+        </p>
       ) : (
         <ul className="grid gap-3 sm:grid-cols-2">
           {eventos.map((e) => (

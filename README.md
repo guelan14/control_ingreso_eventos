@@ -32,16 +32,47 @@ npm run dev          # http://localhost:3000
 (PGlite) que guarda los datos en esa carpeta y aplica las migraciones solo. Sirve para desarrollar; en
 producción se usa un Postgres real.
 
+### Primer usuario
+
+Todo el sistema pide login. El primer administrador se crea desde la terminal (con PGlite, con
+`npm run dev` frenado):
+
+```bash
+npm run usuario:crear -- --usuario admin --nombre "Nombre Apellido" --rol admin
+```
+
+Imprime una contraseña temporal que se cambia en el primer ingreso. El resto de los usuarios los crea
+el administrador desde la pantalla **Usuarios**.
+
+## Usuarios y roles
+
+| Rol             | Puede                                                                 |
+| --------------- | --------------------------------------------------------------------- |
+| `admin`         | Todo, incluida la gestión de usuarios                                 |
+| `organizador`   | Crear eventos y rubros, importar invitados, ver la lista              |
+| `recepcion`     | Ver eventos y buscar invitados (personal de la puerta)                |
+
+Los permisos están en un solo lugar: `src/lib/auth/roles.ts`.
+
+- Contraseñas con hash scrypt; mínimo 10 caracteres. Las que asigna un administrador son temporales.
+- Sesión de 12 horas guardada en la base (cookie `HttpOnly`, `SameSite=Lax`, `Secure` en producción).
+  En la base se guarda solo el hash del token.
+- 5 intentos fallidos bloquean la cuenta 15 minutos; un administrador puede restablecer la contraseña.
+- Desactivar un usuario o restablecer su contraseña cierra sus sesiones al instante.
+- Siempre queda al menos un administrador activo.
+- La API rechaza pedidos que modifican datos si vienen de otro sitio (control de `Origin`).
+
 ## Variables de entorno
 
 | Variable        | Ejemplo                                           | Descripción                          |
 | --------------- | ------------------------------------------------- | ------------------------------------ |
 | `DATABASE_URL`  | `postgres://eventos:eventos@localhost:5432/eventos` | Conexión a Postgres, o `pglite://<carpeta>` |
 | `IMPORT_MAX_MB` | `5`                                               | Tamaño máximo del Excel a importar   |
+| `COOKIE_SECURE` | `true`                                            | Cookie solo por HTTPS. Por defecto `true` en producción; `false` solo para la red local por `http://` |
 
 ## Importar datos de prueba
 
-1. Abrir <http://localhost:3000> → **Nuevo evento** (los rubros sugeridos ya vienen cargados).
+1. Abrir <http://localhost:3000>, ingresar con el administrador → **Nuevo evento** (los rubros sugeridos ya vienen cargados).
 2. En el evento: **Importar invitados** → subir `ejemplos/invitados_demo.xlsx` (320 invitados ficticios)
    → **Validar archivo** → **Confirmar importación**.
 3. Para ver el reporte de errores: `ejemplos/invitados_con_errores.xlsx`.
@@ -76,6 +107,9 @@ Reglas:
 
 ## API
 
+Todos los endpoints piden sesión (cookie), salvo `/api/salud`. Sin sesión responden `401`; sin el
+permiso del rol, `403`.
+
 | Método | Ruta                               | Descripción                                                     |
 | ------ | ---------------------------------- | --------------------------------------------------------------- |
 | GET    | `/api/eventos`                     | Lista de eventos, el más reciente primero                       |
@@ -102,20 +136,23 @@ también por el comienzo del DNI. Errores con formato uniforme: `{ "error": { "m
 | `npm run db:migrate`         | Aplica las migraciones pendientes                          |
 | `npm run db:generate`        | Genera una migración nueva tras cambiar `src/db/schema.ts` |
 | `npm run excel:generar`      | Regenera la plantilla y los Excel de ejemplo               |
+| `npm run usuario:crear`      | Crea un usuario desde la terminal (el primer admin)        |
 
 ## Estructura
 
 ```
 src/
   app/              páginas y endpoints (api/*)
+  proxy.ts          sin cookie de sesión, al login
   db/               esquema Drizzle y conexión a Postgres
   lib/
+    auth/           roles y permisos, contraseñas, sesiones, usuarios
     eventos/        eventos y rubros
     importacion/    lectura del Excel, validación, importación
     invitados/      constantes, normalización, consultas
 drizzle/            migraciones SQL (versionadas)
 scripts/            migraciones en el deploy y generación de Excels
-tests/              tests de validación e importación
+tests/              tests de validación, importación y login
 ejemplos/           Excel de prueba
 ```
 
@@ -127,5 +164,7 @@ cualquier entorno hace falta:
 1. Un PostgreSQL accesible y la variable `DATABASE_URL`.
 2. `npm ci && npm run build`.
 3. Al iniciar: `npm run db:migrate && npm start`. El healthcheck es `/api/salud`.
+4. Una vez: `npm run usuario:crear -- --usuario admin --nombre "..." --rol admin`.
+5. Servirlo por HTTPS (la cookie de sesión es `Secure`).
 
 `railway.json` deja configurado Railway con esos comandos para una demo.

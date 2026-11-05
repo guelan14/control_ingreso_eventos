@@ -1,9 +1,12 @@
 import { getDb } from "@/db/client";
+import { autorizarApi } from "@/lib/auth/dal";
 import { crearEvento, listarEventos, nuevoEventoSchema } from "@/lib/eventos/eventos";
 import { leerJson, respuestaErrorInterno, respuestaValidacion } from "@/lib/http";
 
 /** GET /api/eventos — todos los eventos, el más reciente primero. */
-export async function GET() {
+export async function GET(request: Request) {
+  const sesion = await autorizarApi(request, "eventos:ver");
+  if (sesion instanceof Response) return sesion;
   try {
     return Response.json({ data: await listarEventos(await getDb()) });
   } catch (error) {
@@ -13,6 +16,8 @@ export async function GET() {
 
 /** POST /api/eventos — { nombre, fecha, usaRubros, usaPremiados, rubros[] } */
 export async function POST(request: Request) {
+  const sesion = await autorizarApi(request, "eventos:gestionar");
+  if (sesion instanceof Response) return sesion;
   const cuerpo = await leerJson(request);
   if (cuerpo instanceof Response) return cuerpo;
   const datos = nuevoEventoSchema.safeParse(cuerpo);

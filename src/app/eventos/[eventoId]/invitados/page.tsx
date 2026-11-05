@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { requerirSesion } from "@/lib/auth/dal";
 import { buscarEvento } from "@/lib/eventos/buscar";
 import { filtrosInvitadosSchema, listarInvitados } from "@/lib/invitados/listar";
 
@@ -9,6 +10,7 @@ export default async function Invitados({
   params,
   searchParams,
 }: PageProps<"/eventos/[eventoId]/invitados">) {
+  await requerirSesion("invitados:ver");
   const encontrado = await buscarEvento((await params).eventoId);
   if (!encontrado) notFound();
   const { db, evento } = encontrado;

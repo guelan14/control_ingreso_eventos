@@ -11,6 +11,7 @@ import {
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { ROLES } from "@/lib/auth/roles";
 import { CONFIRMACION_VALORES } from "@/lib/invitados/constants";
 
 const timestamps = {
@@ -83,5 +84,39 @@ export const invitados = pgTable(
   ],
 );
 
+export const rolEnum = pgEnum("rol", ROLES);
+
+export const usuarios = pgTable("usuarios", {
+  id: serial("id").primaryKey(),
+  /** Nombre de usuario para ingresar, en minúsculas. No hace falta email: el personal de puerta puede no tener. */
+  usuario: text("usuario").notNull().unique(),
+  nombre: text("nombre").notNull(),
+  claveHash: text("clave_hash").notNull(),
+  rol: rolEnum("rol").notNull(),
+  activo: boolean("activo").notNull().default(true),
+  /** Las contraseñas que asigna un administrador son temporales. */
+  debeCambiarClave: boolean("debe_cambiar_clave").notNull().default(true),
+  intentosFallidos: integer("intentos_fallidos").notNull().default(0),
+  bloqueadoHasta: timestamp("bloqueado_hasta", { withTimezone: true }),
+  ultimoIngreso: timestamp("ultimo_ingreso", { withTimezone: true }),
+  ...timestamps,
+});
+
+/** Sesiones en la base: se pueden cerrar desde el servidor (al desactivar un usuario, por ejemplo). */
+export const sesiones = pgTable(
+  "sesiones",
+  {
+    /** SHA-256 del token de la cookie: si se filtra la base, los tokens no sirven. */
+    id: text("id").primaryKey(),
+    usuarioId: integer("usuario_id")
+      .notNull()
+      .references(() => usuarios.id, { onDelete: "cascade" }),
+    expiraEn: timestamp("expira_en", { withTimezone: true }).notNull(),
+    creadoEn: timestamp("creado_en", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("sesiones_usuario_idx").on(t.usuarioId), index("sesiones_expira_idx").on(t.expiraEn)],
+);
+
 export type Evento = typeof eventos.$inferSelect;
 export type Invitado = typeof invitados.$inferSelect;
+export type Usuario = typeof usuarios.$inferSelect;
