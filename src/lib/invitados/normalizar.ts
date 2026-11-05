@@ -15,7 +15,12 @@ export function normalizarComparacion(texto: string): string {
     .toLowerCase();
 }
 
-/** Identidad de un invitado: mismo nombre + misma empresa = misma persona. */
+/** Sin DNI, mismo nombre + misma empresa = misma persona. */
 export function claveInvitado(nombreApellido: string, empresa: string): string {
   return `${normalizarComparacion(nombreApellido)}|${normalizarComparacion(empresa)}`;
+}
+
+/** "30.123.456" / "30 123 456" -> "30123456". Acepta también códigos alfanuméricos. */
+export function normalizarDni(dni: string): string {
+  return dni.replace(/[.\s-]/g, "").toUpperCase();
 }

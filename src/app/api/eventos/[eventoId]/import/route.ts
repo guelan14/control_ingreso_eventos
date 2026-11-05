@@ -1,4 +1,4 @@
-import { getDb } from "@/db/client";
+import { buscarEvento } from "@/lib/eventos/buscar";
 import { respuestaError, respuestaErrorInterno } from "@/lib/http";
 import { importarInvitados } from "@/lib/importacion/importar";
 import { ArchivoInvalidoError } from "@/lib/importacion/leer-excel";
@@ -6,11 +6,11 @@ import { ArchivoInvalidoError } from "@/lib/importacion/leer-excel";
 const MAX_MB = Number(process.env.IMPORT_MAX_MB ?? 5);
 
 /**
- * POST /api/import  (multipart/form-data)
+ * POST /api/eventos/:id/import  (multipart/form-data)
  *   archivo:   el .xlsx
  *   confirmar: "true" para grabar. Sin él solo valida y devuelve el reporte (previsualización).
  */
-export async function POST(request: Request) {
+export async function POST(request: Request, ctx: RouteContext<"/api/eventos/[eventoId]/import">) {
   let form: FormData;
   try {
     form = await request.formData();
@@ -32,12 +32,19 @@ export async function POST(request: Request) {
   const confirmar = form.get("confirmar") === "true";
 
   try {
-    const reporte = await importarInvitados(getDb(), await archivo.arrayBuffer(), { confirmar });
+    const encontrado = await buscarEvento((await ctx.params).eventoId);
+    if (!encontrado) return respuestaError(404, "Evento no encontrado.");
+    const reporte = await importarInvitados(
+      encontrado.db,
+      encontrado.evento,
+      await archivo.arrayBuffer(),
+      { confirmar },
+    );
     // 422 solo si se pidió grabar y no se pudo; una previsualización con errores es una respuesta válida.
     const status = confirmar && !reporte.valido ? 422 : 200;
     return Response.json(reporte, { status });
   } catch (error) {
     if (error instanceof ArchivoInvalidoError) return respuestaError(400, error.message);
-    return respuestaErrorInterno("POST /api/import", error);
+    return respuestaErrorInterno("POST /api/eventos/:id/import", error);
   }
 }

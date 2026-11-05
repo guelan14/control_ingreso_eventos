@@ -1,27 +1,38 @@
 import Link from "next/link";
+import { connection } from "next/server";
+import { getDb } from "@/db/client";
+import { listarEventos } from "@/lib/eventos/eventos";
+import { formatearFecha } from "@/lib/fechas";
 
-const MODULOS = [
-  { href: "/importar", titulo: "Importar invitados", detalle: "Cargar el Excel con validación previa", listo: true },
-  { href: "/invitados", titulo: "Lista de invitados", detalle: "Ver los invitados cargados", listo: true },
-  { href: "#", titulo: "Check-in en puerta", detalle: "Semana 2", listo: false },
-  { href: "#", titulo: "Panel en tiempo real", detalle: "Semana 3", listo: false },
-];
+export default async function Inicio() {
+  await connection();
+  const eventos = await listarEventos(await getDb());
 
-export default function Inicio() {
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
-      {MODULOS.map((m) =>
-        m.listo ? (
-          <Link key={m.titulo} href={m.href} className="rounded-lg border bg-white p-5 shadow-sm hover:border-slate-400">
-            <h2 className="font-semibold">{m.titulo}</h2>
-            <p className="text-sm text-slate-600">{m.detalle}</p>
-          </Link>
-        ) : (
-          <div key={m.titulo} className="rounded-lg border border-dashed p-5 text-slate-400">
-            <h2 className="font-semibold">{m.titulo}</h2>
-            <p className="text-sm">{m.detalle}</p>
-          </div>
-        ),
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold">Eventos</h1>
+        <Link href="/eventos/nuevo" className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white">
+          Nuevo evento
+        </Link>
+      </div>
+
+      {eventos.length === 0 ? (
+        <p className="text-slate-600">Todavía no hay eventos. Cree el primero para cargar invitados.</p>
+      ) : (
+        <ul className="grid gap-3 sm:grid-cols-2">
+          {eventos.map((e) => (
+            <li key={e.id}>
+              <Link
+                href={`/eventos/${e.id}`}
+                className="block rounded-lg border bg-white p-5 shadow-sm hover:border-slate-400"
+              >
+                <h2 className="font-semibold">{e.nombre}</h2>
+                <p className="text-sm text-slate-600">{formatearFecha(e.fecha)}</p>
+              </Link>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );

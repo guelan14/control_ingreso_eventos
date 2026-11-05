@@ -14,6 +14,15 @@ export function respuestaValidacion(error: ZodError) {
   );
 }
 
+/** Cuerpo JSON del request, o una respuesta 400 lista para devolver si no es JSON válido. */
+export async function leerJson(request: Request): Promise<unknown> {
+  try {
+    return await request.json();
+  } catch {
+    return respuestaError(400, "El cuerpo debe ser JSON válido.");
+  }
+}
+
 /** Errores no previstos: se loguean completos en el servidor, al cliente va un mensaje genérico. */
 export function respuestaErrorInterno(contexto: string, error: unknown) {
   console.error(`[${contexto}]`, error);

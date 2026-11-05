@@ -1,190 +1,390 @@
 {
-  "version": "6",
-  "dialect": "sqlite",
-  "id": "3bb19b78-9ec0-47bd-bcbc-9284407ffb86",
+  "id": "c1fe671d-5eb1-42ee-91ed-f6c7b577de5c",
   "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
   "tables": {
-    "invitados": {
-      "name": "invitados",
+    "public.eventos": {
+      "name": "eventos",
+      "schema": "",
       "columns": {
         "id": {
           "name": "id",
-          "type": "integer",
+          "type": "serial",
           "primaryKey": true,
+          "notNull": true
+        },
+        "nombre": {
+          "name": "nombre",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fecha": {
+          "name": "fecha",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "usa_rubros": {
+          "name": "usa_rubros",
+          "type": "boolean",
+          "primaryKey": false,
           "notNull": true,
-          "autoincrement": true
+          "default": true
+        },
+        "usa_premiados": {
+          "name": "usa_premiados",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "creado_en": {
+          "name": "creado_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "actualizado_en": {
+          "name": "actualizado_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.invitados": {
+      "name": "invitados",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "evento_id": {
+          "name": "evento_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
         },
         "nombre_apellido": {
           "name": "nombre_apellido",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "rubro": {
-          "name": "rubro",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "empresa": {
           "name": "empresa",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "cargo": {
           "name": "cargo",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
+        },
+        "dni": {
+          "name": "dni",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rubro_id": {
+          "name": "rubro_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
         },
         "confirmacion": {
           "name": "confirmacion",
-          "type": "text",
+          "type": "confirmacion",
+          "typeSchema": "public",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "premiado": {
           "name": "premiado",
-          "type": "integer",
+          "type": "boolean",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": false
         },
         "sector": {
           "name": "sector",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "checkin_en": {
           "name": "checkin_en",
-          "type": "integer",
+          "type": "timestamp with time zone",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
-        "clave_unica": {
-          "name": "clave_unica",
+        "clave_nombre": {
+          "name": "clave_nombre",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "creado_en": {
           "name": "creado_en",
-          "type": "integer",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
-          "default": "(unixepoch('subsec') * 1000)"
+          "default": "now()"
         },
         "actualizado_en": {
           "name": "actualizado_en",
-          "type": "integer",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
-          "default": "(unixepoch('subsec') * 1000)"
+          "default": "now()"
         }
       },
       "indexes": {
-        "invitados_clave_unica_idx": {
-          "name": "invitados_clave_unica_idx",
+        "invitados_evento_dni_idx": {
+          "name": "invitados_evento_dni_idx",
           "columns": [
-            "clave_unica"
+            {
+              "expression": "evento_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "dni",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "isUnique": true
+          "isUnique": true,
+          "where": "\"invitados\".\"dni\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
-        "invitados_checkin_idx": {
-          "name": "invitados_checkin_idx",
+        "invitados_evento_clave_sin_dni_idx": {
+          "name": "invitados_evento_clave_sin_dni_idx",
           "columns": [
-            "checkin_en"
+            {
+              "expression": "evento_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "clave_nombre",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "isUnique": false
+          "isUnique": true,
+          "where": "\"invitados\".\"dni\" is null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
-        "invitados_rubro_idx": {
-          "name": "invitados_rubro_idx",
+        "invitados_evento_clave_idx": {
+          "name": "invitados_evento_clave_idx",
           "columns": [
-            "rubro"
+            {
+              "expression": "evento_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "clave_nombre",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "isUnique": false
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
-        "invitados_premiado_idx": {
-          "name": "invitados_premiado_idx",
+        "invitados_evento_checkin_idx": {
+          "name": "invitados_evento_checkin_idx",
           "columns": [
-            "premiado"
+            {
+              "expression": "evento_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "checkin_en",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "isUnique": false
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "invitados_evento_premiado_idx": {
+          "name": "invitados_evento_premiado_idx",
+          "columns": [
+            {
+              "expression": "evento_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "premiado",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
-        "invitados_rubro_rubros_nombre_fk": {
-          "name": "invitados_rubro_rubros_nombre_fk",
+        "invitados_evento_id_eventos_id_fk": {
+          "name": "invitados_evento_id_eventos_id_fk",
+          "tableFrom": "invitados",
+          "tableTo": "eventos",
+          "columnsFrom": [
+            "evento_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "invitados_rubro_id_rubros_id_fk": {
+          "name": "invitados_rubro_id_rubros_id_fk",
           "tableFrom": "invitados",
           "tableTo": "rubros",
           "columnsFrom": [
-            "rubro"
+            "rubro_id"
           ],
           "columnsTo": [
-            "nombre"
+            "id"
           ],
           "onDelete": "no action",
-          "onUpdate": "cascade"
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
-    "rubros": {
+    "public.rubros": {
       "name": "rubros",
+      "schema": "",
       "columns": {
         "id": {
           "name": "id",
-          "type": "integer",
+          "type": "serial",
           "primaryKey": true,
-          "notNull": true,
-          "autoincrement": true
+          "notNull": true
+        },
+        "evento_id": {
+          "name": "evento_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
         },
         "nombre": {
           "name": "nombre",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         }
       },
       "indexes": {
-        "rubros_nombre_unique": {
-          "name": "rubros_nombre_unique",
+        "rubros_evento_nombre_idx": {
+          "name": "rubros_evento_nombre_idx",
           "columns": [
-            "nombre"
+            {
+              "expression": "evento_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "nombre",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "isUnique": true
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
-      "foreignKeys": {},
+      "foreignKeys": {
+        "rubros_evento_id_eventos_id_fk": {
+          "name": "rubros_evento_id_eventos_id_fk",
+          "tableFrom": "rubros",
+          "tableTo": "eventos",
+          "columnsFrom": [
+            "evento_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     }
   },
-  "views": {},
-  "enums": {},
-  "_meta": {
-    "schemas": {},
-    "tables": {},
-    "columns": {}
+  "enums": {
+    "public.confirmacion": {
+      "name": "confirmacion",
+      "schema": "public",
+      "values": [
+        "Confirmado",
+        "No Puede"
+      ]
+    }
   },
-  "internal": {
-    "indexes": {}
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
   }
 }

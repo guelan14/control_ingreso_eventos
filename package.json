@@ -11,13 +11,17 @@
     "test:watch": "vitest",
     "typecheck": "next typegen && tsc --noEmit",
     "db:generate": "drizzle-kit generate",
-    "excel:generar": "tsx scripts/generar-excels.mts"
+    "excel:generar": "tsx scripts/generar-excels.mts",
+    "db:up": "docker compose up -d --wait postgres",
+    "db:migrate": "node --env-file-if-exists=.env.local scripts/migrar.mjs"
   },
   "dependencies": {
-    "better-sqlite3": "^13.0.3",
+    "@electric-sql/pglite": "^0.5.15",
     "drizzle-orm": "^0.45.3",
     "exceljs": "^4.4.0",
+    "geist": "^1.9.1",
     "next": "16.3.8",
+    "pg": "^8.23.1",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "server-only": "^0.0.1",
@@ -25,8 +29,8 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
-    "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^24.19.1",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "drizzle-kit": "^0.31.11",

@@ -9,19 +9,19 @@ type Estado =
   | { tipo: "reporte"; reporte: ReporteImportacion }
   | { tipo: "error"; mensaje: string };
 
-async function enviar(archivo: File, confirmar: boolean): Promise<ReporteImportacion> {
+async function enviar(eventoId: number, archivo: File, confirmar: boolean): Promise<ReporteImportacion> {
   const form = new FormData();
   form.append("archivo", archivo);
   if (confirmar) form.append("confirmar", "true");
 
-  const respuesta = await fetch("/api/import", { method: "POST", body: form });
+  const respuesta = await fetch(`/api/eventos/${eventoId}/import`, { method: "POST", body: form });
   const cuerpo = await respuesta.json().catch(() => null);
   // 422 trae un reporte con errores: se muestra igual que una validación.
   if (respuesta.ok || respuesta.status === 422) return cuerpo as ReporteImportacion;
   throw new Error(cuerpo?.error?.mensaje ?? `Error ${respuesta.status}`);
 }
 
-export function FormularioImportacion() {
+export function FormularioImportacion({ eventoId }: { eventoId: number }) {
   const [archivo, setArchivo] = useState<File | null>(null);
   const [estado, setEstado] = useState<Estado>({ tipo: "inicial" });
 
@@ -29,7 +29,7 @@ export function FormularioImportacion() {
     if (!archivo) return;
     setEstado({ tipo: "cargando", accion: confirmar ? "importar" : "validar" });
     try {
-      setEstado({ tipo: "reporte", reporte: await enviar(archivo, confirmar) });
+      setEstado({ tipo: "reporte", reporte: await enviar(eventoId, archivo, confirmar) });
     } catch (e) {
       const mensaje = e instanceof TypeError ? "Sin conexión con el servidor." : (e as Error).message;
       setEstado({ tipo: "error", mensaje });

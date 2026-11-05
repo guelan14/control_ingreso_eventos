@@ -1,11 +1,14 @@
-/** Rubros iniciales. Se guardan en la tabla `rubros` para poder agregar más desde la app. */
-export const RUBROS_BASE = [
+/**
+ * Rubros sugeridos al crear un evento. Cada evento tiene los suyos (cambian de un año a otro)
+ * y los organizadores pueden editarlos.
+ */
+export const RUBROS_SUGERIDOS = [
   "Agroindustria",
   "Comercio",
   "Automotriz",
   "Trayectoria",
   "Innovación",
-  "Construcción",
+  "Construcción e Inmobiliaria",
   "Educación",
   "Finanzas",
   "Foresto-Industria",
@@ -20,19 +23,39 @@ export const PREMIADO_VALORES = ["SI", "NO"] as const;
 /** Hoja obligatoria dentro del .xlsx */
 export const HOJA_INVITADOS = "Invitados";
 
+/** Qué partes del sistema usa un evento: una charla puede no tener rubros ni premiados. */
+export type ConfigEvento = {
+  usaRubros: boolean;
+  usaPremiados: boolean;
+};
+
 /**
- * Columnas del Excel. `alias` cubre la inconsistencia del documento de requisitos,
- * que escribe tanto "confirmación" como "confirmacion".
+ * Columnas del Excel.
+ * `requerida`: "siempre", "nunca", o solo si el evento usa rubros / premiados.
+ * `alias` cubre la inconsistencia del documento de requisitos ("confirmación" / "confirmacion").
  */
 export const COLUMNAS = [
-  { campo: "nombre_apellido", requerida: true, alias: [] },
-  { campo: "rubro", requerida: true, alias: [] },
-  { campo: "empresa", requerida: true, alias: [] },
-  { campo: "cargo", requerida: false, alias: [] },
-  { campo: "confirmacion", requerida: true, alias: ["confirmación"] },
-  { campo: "premiado", requerida: true, alias: [] },
-  { campo: "sector", requerida: false, alias: [] },
+  { campo: "nombre_apellido", requerida: "siempre", alias: [] },
+  { campo: "rubro", requerida: "rubros", alias: [] },
+  { campo: "empresa", requerida: "siempre", alias: [] },
+  { campo: "cargo", requerida: "nunca", alias: [] },
+  { campo: "dni", requerida: "nunca", alias: [] },
+  { campo: "confirmacion", requerida: "siempre", alias: ["confirmación"] },
+  { campo: "premiado", requerida: "premiados", alias: [] },
+  { campo: "sector", requerida: "nunca", alias: [] },
 ] as const;
 
 export type CampoExcel = (typeof COLUMNAS)[number]["campo"];
-export type CampoOpcional = Extract<(typeof COLUMNAS)[number], { requerida: false }>["campo"];
+
+/** Las columnas que aplican a un evento (las de rubro/premiado desaparecen si no las usa). */
+export function columnasDelEvento(config: ConfigEvento) {
+  return COLUMNAS.filter(
+    (c) =>
+      (c.requerida !== "rubros" || config.usaRubros) &&
+      (c.requerida !== "premiados" || config.usaPremiados),
+  );
+}
+
+export function esColumnaRequerida(columna: (typeof COLUMNAS)[number]) {
+  return columna.requerida !== "nunca";
+}

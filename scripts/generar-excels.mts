@@ -3,12 +3,13 @@
  *   public/plantilla_invitados.xlsx   -> plantilla oficial (encabezados + 3 filas de ejemplo)
  *   ejemplos/invitados_demo.xlsx      -> 320 invitados ficticios para probar / demo
  *   ejemplos/invitados_con_errores.xlsx -> para mostrar el reporte de errores
+ *   ejemplos/invitados_charla.xlsx    -> evento sin rubros ni premiados
  *
  * Uso: npm run excel:generar
  */
 import fs from "node:fs/promises";
 import path from "node:path";
-import { CONFIRMACION_VALORES, RUBROS_BASE } from "../src/lib/invitados/constants";
+import { CONFIRMACION_VALORES, RUBROS_SUGERIDOS } from "../src/lib/invitados/constants";
 import { crearLibroInvitados, FILAS_EJEMPLO, type FilaPlantilla } from "../src/lib/importacion/plantilla";
 
 const NOMBRES = ["Ana", "Carlos", "Lucía", "Martín", "Sofía", "Diego", "Valeria", "Pablo", "Camila", "Jorge", "Romina", "Hernán", "Florencia", "Gustavo", "Paula", "Ricardo"];
@@ -24,9 +25,11 @@ function demo(cantidad: number): FilaPlantilla[] {
 
   return Array.from({ length: cantidad }, (_, i) => ({
     nombre_apellido: `${elegir(NOMBRES)} ${elegir(APELLIDOS)} ${i + 1}`,
-    rubro: elegir(RUBROS_BASE),
+    rubro: elegir(RUBROS_SUGERIDOS),
     empresa: elegir(EMPRESAS),
     cargo: azar() > 0.3 ? "Director" : null,
+    // Un tercio con DNI: el resto se identifica por nombre + empresa.
+    dni: azar() > 0.66 ? String(20_000_000 + i * 7919) : null,
     confirmacion: azar() > 0.1 ? CONFIRMACION_VALORES[0] : CONFIRMACION_VALORES[1],
     premiado: azar() > 0.93 ? "SI" : "NO",
     sector: elegir(SECTORES),
@@ -50,3 +53,8 @@ async function escribir(destino: string, contenido: ArrayBuffer) {
 await escribir("public/plantilla_invitados.xlsx", await crearLibroInvitados(FILAS_EJEMPLO));
 await escribir("ejemplos/invitados_demo.xlsx", await crearLibroInvitados(demo(320)));
 await escribir("ejemplos/invitados_con_errores.xlsx", await crearLibroInvitados(CON_ERRORES));
+await escribir(
+  "ejemplos/invitados_charla.xlsx",
+  // Sin esas columnas en la plantilla, rubro y premiado de las filas demo no se escriben.
+  await crearLibroInvitados(demo(40), { usaRubros: false, usaPremiados: false, rubros: [] }),
+);

@@ -1,37 +1,39 @@
-import fs from "node:fs";
 import path from "node:path";
-import Database from "better-sqlite3";
-import { drizzle } from "drizzle-orm/better-sqlite3";
-import { migrate } from "drizzle-orm/better-sqlite3/migrator";
-import { RUBROS_BASE } from "@/lib/invitados/constants";
+import { PGlite } from "@electric-sql/pglite";
+import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
+import { drizzle as drizzlePg } from "drizzle-orm/node-postgres";
+import { drizzle as drizzlePglite } from "drizzle-orm/pglite";
+import { migrate as migratePglite } from "drizzle-orm/pglite/migrator";
+import { Pool } from "pg";
 import * as schema from "./schema";
 
-export type Db = ReturnType<typeof createDb>;
+/** Cualquier conexión Postgres del proyecto (servidor real o PGlite). */
+export type Db = PgDatabase<PgQueryResultHKT, typeof schema>;
+/** Una conexión o una transacción abierta: las funciones de acceso a datos aceptan ambas. */
+export type Ejecutor = Db | Parameters<Parameters<Db["transaction"]>[0]>[0];
 
 const MIGRATIONS_DIR = path.join(process.cwd(), "drizzle");
+const PREFIJO_PGLITE = "pglite://";
+
+/** Postgres real. Las migraciones se aplican aparte con `npm run db:migrate`. */
+export function crearDbPostgres(url: string): Db {
+  const pool = new Pool({ connectionString: url, max: 10 });
+  return drizzlePg(pool, { schema });
+}
 
 /**
- * Abre la base, aplica migraciones pendientes y carga los rubros base.
- * Acepta ":memory:" para tests.
+ * Postgres embebido (PGlite), sin instalar nada: para tests (en memoria) y desarrollo sin Docker.
+ * Aplica las migraciones al abrir.
  */
-export function createDb(filePath: string) {
-  if (filePath !== ":memory:") {
-    fs.mkdirSync(path.dirname(path.resolve(filePath)), { recursive: true });
-  }
-
-  const sqlite = new Database(filePath);
-  // WAL permite que el panel lea mientras la puerta escribe check-ins.
-  sqlite.pragma("journal_mode = WAL");
-  sqlite.pragma("foreign_keys = ON");
-  sqlite.pragma("busy_timeout = 5000");
-
-  const db = drizzle(sqlite, { schema });
-  migrate(db, { migrationsFolder: MIGRATIONS_DIR });
-
-  db.insert(schema.rubros)
-    .values(RUBROS_BASE.map((nombre) => ({ nombre })))
-    .onConflictDoNothing()
-    .run();
-
+export async function crearDbPglite(carpeta?: string): Promise<Db> {
+  const db = drizzlePglite(new PGlite(carpeta), { schema });
+  await migratePglite(db, { migrationsFolder: MIGRATIONS_DIR });
   return db;
+}
+
+/** DATABASE_URL=postgres://... (producción, Docker) o pglite://./data/pglite (desarrollo). */
+export function crearDbDesdeUrl(url: string): Promise<Db> | Db {
+  return url.startsWith(PREFIJO_PGLITE)
+    ? crearDbPglite(url.slice(PREFIJO_PGLITE.length))
+    : crearDbPostgres(url);
 }

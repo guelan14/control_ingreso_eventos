@@ -1,13 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { RUBROS_BASE } from "@/lib/invitados/constants";
-import { validarInvitados, type FilaCruda } from "@/lib/importacion/validar";
+import { RUBROS_SUGERIDOS } from "@/lib/invitados/constants";
+import { validarInvitados, type ContextoValidacion, type FilaCruda } from "@/lib/importacion/validar";
 
 const ENCABEZADOS = ["nombre_apellido", "rubro", "empresa", "cargo", "confirmacion", "premiado", "sector"];
 const valida = ["Juan Pérez", "Comercio", "ACME", "CEO", "Confirmado", "SI", "A"];
 
+const COMPLETO: ContextoValidacion = { usaRubros: true, usaPremiados: true, rubros: RUBROS_SUGERIDOS };
+const CHARLA: ContextoValidacion = { usaRubros: false, usaPremiados: false, rubros: [] };
+
 const filas = (...datos: unknown[][]): FilaCruda[] => datos.map((celdas, i) => ({ fila: i + 2, celdas }));
-const validar = (encabezados: unknown[], datos: FilaCruda[]) =>
-  validarInvitados(encabezados, datos, RUBROS_BASE);
+const validar = (encabezados: unknown[], datos: FilaCruda[], contexto = COMPLETO) =>
+  validarInvitados(encabezados, datos, contexto);
 
 describe("encabezados", () => {
   it("acepta el formato oficial", () => {
@@ -32,7 +35,7 @@ describe("encabezados", () => {
     const enc = ["nombre_apellido", "rubro", "empresa", "confirmacion", "premiado"];
     const r = validar(enc, filas(["Ana", "Finanzas", "Banco", "Confirmado", "NO"]));
     expect(r.errores).toEqual([]);
-    expect(r.filasValidas[0].invitado).toMatchObject({ cargo: null, sector: null });
+    expect(r.filasValidas[0].invitado).toMatchObject({ cargo: null, sector: null, dni: null });
   });
 
   it("rechaza encabezados con espacios o mayúsculas y lo explica", () => {
@@ -49,6 +52,24 @@ describe("encabezados", () => {
   });
 });
 
+describe("eventos sin rubros ni premiados", () => {
+  it("no exige rubro ni premiado", () => {
+    const r = validar(["nombre_apellido", "empresa", "confirmacion"], filas(["Ana", "UNaM", "Confirmado"]), CHARLA);
+    expect(r.errores).toEqual([]);
+    expect(r.filasValidas[0].invitado).toMatchObject({ rubro: null, premiado: false });
+  });
+
+  it("si el Excel trae esas columnas, las ignora con una advertencia", () => {
+    const r = validar(ENCABEZADOS, filas(valida), CHARLA);
+    expect(r.errores).toEqual([]);
+    expect(r.filasValidas[0].invitado).toMatchObject({ rubro: null, premiado: false });
+    expect(r.advertencias.map((a) => a.mensaje)).toEqual([
+      expect.stringContaining("no usa rubros"),
+      expect.stringContaining("no usa premiados"),
+    ]);
+  });
+});
+
 describe("filas", () => {
   it("normaliza espacios y mapea premiado a booleano", () => {
     const r = validar(ENCABEZADOS, filas(["  Juan   Pérez ", "Comercio", "ACME", "", "Confirmado", "NO", ""]));
@@ -56,7 +77,7 @@ describe("filas", () => {
       nombreApellido: "Juan Pérez",
       premiado: false,
       cargo: null,
-      claveUnica: "juan perez|acme",
+      claveNombre: "juan perez|acme",
     });
   });
 
@@ -78,14 +99,16 @@ describe("filas", () => {
     expect(r.filasValidas).toHaveLength(1);
   });
 
-  it("tolera mayúsculas/tildes en rubro y guarda el nombre oficial", () => {
+  it("tolera mayúsculas/tildes en rubro y guarda el nombre del evento", () => {
     const r = validar(ENCABEZADOS, filas(["Ana", "innovacion", "X", "", "Confirmado", "NO", ""]));
     expect(r.filasValidas[0].invitado.rubro).toBe("Innovación");
   });
 
-  it("rechaza rubros inexistentes", () => {
-    const r = validar(ENCABEZADOS, filas(["Ana", "Pesca", "X", "", "Confirmado", "NO", ""]));
+  it("valida el rubro contra los rubros de ese evento", () => {
+    const evento2027 = { ...COMPLETO, rubros: ["Turismo"] };
+    const r = validar(ENCABEZADOS, filas(valida), evento2027);
     expect(r.errores[0]).toMatchObject({ fila: 2, campo: "rubro" });
+    expect(r.errores[0].mensaje).toContain("Turismo");
   });
 
   it("detecta invitados duplicados dentro del mismo archivo (nombre + empresa)", () => {
@@ -98,5 +121,34 @@ describe("filas", () => {
     const r = validar(ENCABEZADOS, filas(["", null, undefined]));
     expect(r.totalFilas).toBe(0);
     expect(r.errores[0].mensaje).toContain("no tiene invitados");
+  });
+});
+
+describe("DNI", () => {
+  const ENC_DNI = [...ENCABEZADOS, "dni"];
+  const conDni = (nombre: string, dni: string) => [nombre, "Comercio", "ACME", "", "Confirmado", "NO", "", dni];
+
+  it("normaliza puntos y espacios", () => {
+    const r = validar(ENC_DNI, filas(conDni("Ana", "30.123.456")));
+    expect(r.filasValidas[0].invitado.dni).toBe("30123456");
+  });
+
+  it("acepta homónimos si ambos tienen DNI distinto", () => {
+    const r = validar(ENC_DNI, filas(conDni("Juan Pérez", "30111222"), conDni("Juan Pérez", "35999888")));
+    expect(r.errores).toEqual([]);
+    expect(r.filasValidas).toHaveLength(2);
+  });
+
+  it("rechaza homónimos si alguno no tiene DNI", () => {
+    const r = validar(ENC_DNI, filas(conDni("Juan Pérez", "30111222"), conDni("Juan Pérez", "")));
+    expect(r.errores[0].mensaje).toContain("cargue el DNI");
+  });
+
+  it("rechaza DNI repetido o con caracteres inválidos", () => {
+    const r = validar(ENC_DNI, filas(conDni("Ana", "30111222"), conDni("Luis", "30.111.222"), conDni("Eva", "30/1")));
+    expect(r.errores.map((e) => [e.fila, e.campo])).toEqual([
+      [3, "dni"],
+      [4, "dni"],
+    ]);
   });
 });

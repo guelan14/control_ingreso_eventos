@@ -1,12 +1,19 @@
 import { z } from "@/lib/zod";
 import {
-  COLUMNAS,
   CONFIRMACION_VALORES,
   PREMIADO_VALORES,
+  columnasDelEvento,
+  esColumnaRequerida,
   type CampoExcel,
+  type ConfigEvento,
   type Confirmacion,
 } from "@/lib/invitados/constants";
-import { claveInvitado, limpiarTexto, normalizarComparacion } from "@/lib/invitados/normalizar";
+import {
+  claveInvitado,
+  limpiarTexto,
+  normalizarComparacion,
+  normalizarDni,
+} from "@/lib/invitados/normalizar";
 
 export type ProblemaImportacion = {
   /** Número de fila en el Excel (1 = encabezado). null = problema del archivo completo. */
@@ -17,16 +24,22 @@ export type ProblemaImportacion = {
 
 export type InvitadoImportado = {
   nombreApellido: string;
-  rubro: string;
   empresa: string;
-  cargo: string | null;
+  /** null si el evento no usa rubros */
+  rubro: string | null;
   confirmacion: Confirmacion;
   premiado: boolean;
+  /** Opcionales: null = celda vacía o columna ausente, no se modifica el dato existente. */
+  cargo: string | null;
+  dni: string | null;
   sector: string | null;
-  claveUnica: string;
+  claveNombre: string;
 };
 
 export type FilaCruda = { fila: number; celdas: unknown[] };
+
+/** Configuración del evento + los rubros que tiene cargados. */
+export type ContextoValidacion = ConfigEvento & { rubros: readonly string[] };
 
 export type ResultadoValidacion = {
   columnasPresentes: CampoExcel[];
@@ -37,9 +50,10 @@ export type ResultadoValidacion = {
 };
 
 /** Mapea cada encabezado a su campo. Devuelve el índice de columna de cada campo. */
-export function validarEncabezados(encabezados: unknown[]) {
+export function validarEncabezados(encabezados: unknown[], config: ConfigEvento) {
   const errores: ProblemaImportacion[] = [];
   const advertencias: ProblemaImportacion[] = [];
+  const columnas = columnasDelEvento(config);
   const indicePorCampo = new Map<CampoExcel, number>();
   // Columnas que están pero mal escritas: ya tienen su error, no repetir "falta la columna".
   const malEscritas = new Set<CampoExcel>();
@@ -47,13 +61,13 @@ export function validarEncabezados(encabezados: unknown[]) {
   encabezados.forEach((crudo, indice) => {
     if (crudo === null || crudo === undefined || String(crudo).trim() === "") return;
     const encabezado = String(crudo);
-    const columna = COLUMNAS.find(
+    const columna = columnas.find(
       (c) => c.campo === encabezado || (c.alias as readonly string[]).includes(encabezado),
     );
 
     if (!columna) {
       const comparable = normalizarComparacion(encabezado).replace(/ /g, "_");
-      const parecida = COLUMNAS.find((c) => normalizarComparacion(c.campo) === comparable);
+      const parecida = columnas.find((c) => normalizarComparacion(c.campo) === comparable);
       if (parecida) {
         malEscritas.add(parecida.campo);
         errores.push({
@@ -62,10 +76,14 @@ export function validarEncabezados(encabezados: unknown[]) {
           mensaje: `El encabezado "${encabezado}" debe escribirse exactamente "${parecida.campo}" (sin espacios extra ni mayúsculas).`,
         });
       } else {
+        const motivo =
+          comparable === "rubro" || comparable === "premiado"
+            ? `este evento no usa ${comparable === "rubro" ? "rubros" : "premiados"}`
+            : "no se reconoce";
         advertencias.push({
           fila: 1,
           campo: encabezado,
-          mensaje: `La columna "${encabezado}" no se reconoce y será ignorada.`,
+          mensaje: `La columna "${encabezado}" ${motivo} y será ignorada.`,
         });
       }
       return;
@@ -82,8 +100,12 @@ export function validarEncabezados(encabezados: unknown[]) {
     indicePorCampo.set(columna.campo, indice);
   });
 
-  for (const columna of COLUMNAS) {
-    if (columna.requerida && !indicePorCampo.has(columna.campo) && !malEscritas.has(columna.campo)) {
+  for (const columna of columnas) {
+    if (
+      esColumnaRequerida(columna) &&
+      !indicePorCampo.has(columna.campo) &&
+      !malEscritas.has(columna.campo)
+    ) {
       errores.push({
         fila: 1,
         campo: columna.campo,
@@ -99,26 +121,43 @@ function esValorDe<T extends string>(lista: readonly T[], valor: string): valor 
   return (lista as readonly string[]).includes(valor);
 }
 
-function esquemaFila(rubrosValidos: readonly string[]) {
+function esquemaFila({ usaRubros, usaPremiados, rubros }: ContextoValidacion) {
   // Rubro: se tolera mayúsculas/tildes y se guarda el nombre canónico.
-  const rubroCanonico = new Map(rubrosValidos.map((r) => [normalizarComparacion(r), r]));
+  const rubroCanonico = new Map(rubros.map((r) => [normalizarComparacion(r), r]));
   const requerido = (campo: string) =>
     z.string({ error: `El campo "${campo}" es obligatorio.` });
+  const opcional = (max: number) => z.string().max(max, `Máximo ${max} caracteres.`).nullable();
+
+  const rubro = requerido("rubro").transform((valor, ctx) => {
+    const canonico = rubroCanonico.get(normalizarComparacion(valor));
+    if (!canonico) {
+      ctx.addIssue({
+        code: "custom",
+        message:
+          rubros.length > 0
+            ? `Rubro "${valor}" no válido. Rubros del evento: ${rubros.join(", ")}.`
+            : `Rubro "${valor}" no válido: el evento todavía no tiene rubros cargados.`,
+      });
+      return z.NEVER;
+    }
+    return canonico;
+  });
+
+  const premiado = requerido("premiado").transform((valor, ctx) => {
+    if (!esValorDe(PREMIADO_VALORES, valor)) {
+      ctx.addIssue({
+        code: "custom",
+        message: `Valor "${valor}" no válido. Use exactamente: SI / NO (en mayúsculas).`,
+      });
+      return z.NEVER;
+    }
+    return valor === "SI";
+  });
 
   return z.object({
     nombre_apellido: requerido("nombre_apellido").max(200, "Máximo 200 caracteres."),
     empresa: requerido("empresa").max(200, "Máximo 200 caracteres."),
-    rubro: requerido("rubro").transform((valor, ctx) => {
-      const canonico = rubroCanonico.get(normalizarComparacion(valor));
-      if (!canonico) {
-        ctx.addIssue({
-          code: "custom",
-          message: `Rubro "${valor}" no válido. Valores aceptados: ${rubrosValidos.join(", ")}.`,
-        });
-        return z.NEVER;
-      }
-      return canonico;
-    }),
+    rubro: usaRubros ? rubro : z.null().transform(() => null),
     confirmacion: requerido("confirmacion").transform((valor, ctx) => {
       if (!esValorDe(CONFIRMACION_VALORES, valor)) {
         ctx.addIssue({
@@ -129,34 +168,39 @@ function esquemaFila(rubrosValidos: readonly string[]) {
       }
       return valor;
     }),
-    premiado: requerido("premiado").transform((valor, ctx) => {
-      if (!esValorDe(PREMIADO_VALORES, valor)) {
-        ctx.addIssue({
-          code: "custom",
-          message: `Valor "${valor}" no válido. Use exactamente: SI / NO (en mayúsculas).`,
-        });
-        return z.NEVER;
-      }
-      return valor === "SI";
-    }),
-    cargo: z.string().max(200, "Máximo 200 caracteres.").nullable(),
-    sector: z.string().max(50, "Máximo 50 caracteres.").nullable(),
+    premiado: usaPremiados ? premiado : z.null().transform(() => false),
+    cargo: opcional(200),
+    sector: opcional(50),
+    dni: z
+      .string()
+      .nullable()
+      .transform((valor, ctx) => {
+        if (valor === null) return null;
+        const dni = normalizarDni(valor);
+        if (!/^[0-9A-Z]{4,20}$/.test(dni)) {
+          ctx.addIssue({
+            code: "custom",
+            message: `DNI "${valor}" no válido: solo números o letras (se aceptan puntos y espacios).`,
+          });
+          return z.NEVER;
+        }
+        return dni;
+      }),
   });
 }
 
 /**
- * Valida encabezados y filas de la hoja "Invitados".
+ * Valida encabezados y filas de la hoja "Invitados" según la configuración del evento.
  * Función pura: no toca la base de datos, para poder testearla y usarla en modo "previsualizar".
  */
 export function validarInvitados(
   encabezados: unknown[],
   filas: FilaCruda[],
-  rubrosValidos: readonly string[],
+  contexto: ContextoValidacion,
 ): ResultadoValidacion {
-  const { indicePorCampo, errores, advertencias } = validarEncabezados(encabezados);
-  const columnasPresentes = [...indicePorCampo.keys()];
+  const { indicePorCampo, errores, advertencias } = validarEncabezados(encabezados, contexto);
   const resultado: ResultadoValidacion = {
-    columnasPresentes,
+    columnasPresentes: [...indicePorCampo.keys()],
     filasValidas: [],
     errores,
     advertencias,
@@ -166,12 +210,14 @@ export function validarInvitados(
   // Si faltan columnas no tiene sentido validar fila por fila: todas fallarían igual.
   if (errores.length > 0) return resultado;
 
-  const esquema = esquemaFila(rubrosValidos);
-  const primeraFilaPorClave = new Map<string, number>();
+  const columnas = columnasDelEvento(contexto);
+  const esquema = esquemaFila(contexto);
+  const filaPorDni = new Map<string, number>();
+  const filaPorClave = new Map<string, { fila: number; conDni: boolean }>();
 
   for (const { fila, celdas } of filas) {
     const valores = Object.fromEntries(
-      COLUMNAS.map(({ campo }) => {
+      columnas.map(({ campo }) => {
         const indice = indicePorCampo.get(campo);
         return [campo, indice === undefined ? null : limpiarTexto(celdas[indice])];
       }),
@@ -181,7 +227,7 @@ export function validarInvitados(
     if (Object.values(valores).every((v) => v === null)) continue;
     resultado.totalFilas++;
 
-    const parseo = esquema.safeParse(valores);
+    const parseo = esquema.safeParse({ rubro: null, premiado: null, ...valores });
     if (!parseo.success) {
       for (const issue of parseo.error.issues) {
         errores.push({ fila, campo: String(issue.path[0] ?? ""), mensaje: issue.message });
@@ -190,17 +236,32 @@ export function validarInvitados(
     }
 
     const d = parseo.data;
-    const claveUnica = claveInvitado(d.nombre_apellido, d.empresa);
-    const filaPrevia = primeraFilaPorClave.get(claveUnica);
-    if (filaPrevia !== undefined) {
+    const claveNombre = claveInvitado(d.nombre_apellido, d.empresa);
+
+    if (d.dni !== null) {
+      const filaPrevia = filaPorDni.get(d.dni);
+      if (filaPrevia !== undefined) {
+        errores.push({
+          fila,
+          campo: "dni",
+          mensaje: `DNI ${d.dni} repetido: ya aparece en la fila ${filaPrevia}.`,
+        });
+        continue;
+      }
+      filaPorDni.set(d.dni, fila);
+    }
+
+    // Homónimos (mismo nombre y empresa) solo se aceptan si ambos tienen DNI.
+    const previa = filaPorClave.get(claveNombre);
+    if (previa && (!previa.conDni || d.dni === null)) {
       errores.push({
         fila,
         campo: "nombre_apellido",
-        mensaje: `Invitado duplicado: "${d.nombre_apellido}" de "${d.empresa}" ya aparece en la fila ${filaPrevia}.`,
+        mensaje: `"${d.nombre_apellido}" de "${d.empresa}" ya aparece en la fila ${previa.fila}. Si son personas distintas, cargue el DNI de ambas.`,
       });
       continue;
     }
-    primeraFilaPorClave.set(claveUnica, fila);
+    filaPorClave.set(claveNombre, { fila, conDni: d.dni !== null });
 
     resultado.filasValidas.push({
       fila,
@@ -208,11 +269,12 @@ export function validarInvitados(
         nombreApellido: d.nombre_apellido,
         empresa: d.empresa,
         rubro: d.rubro,
-        cargo: d.cargo,
         confirmacion: d.confirmacion,
         premiado: d.premiado,
+        cargo: d.cargo,
+        dni: d.dni,
         sector: d.sector,
-        claveUnica,
+        claveNombre,
       },
     });
   }
