@@ -19,6 +19,7 @@ export const PERMISOS = {
   "eventos:gestionar": ["admin", "organizador"],
   "invitados:ver": ["admin", "organizador", "recepcion"],
   "invitados:importar": ["admin", "organizador"],
+  "checkin:registrar": ["admin", "organizador", "recepcion"],
   "usuarios:gestionar": ["admin"],
 } as const satisfies Record<string, readonly Rol[]>;
 

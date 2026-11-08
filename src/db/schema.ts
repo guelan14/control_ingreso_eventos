@@ -117,6 +117,40 @@ export const sesiones = pgTable(
   (t) => [index("sesiones_usuario_idx").on(t.usuarioId), index("sesiones_expira_idx").on(t.expiraEn)],
 );
 
+export const tipoCheckinEnum = pgEnum("tipo_checkin", ["ingreso", "correccion"]);
+
+/**
+ * Registro de ingresos: solo se agregan filas, nunca se editan ni borran (auditoría: quién, cuándo,
+ * desde qué dispositivo). invitados.checkin_en es la copia de la hora vigente, para consultar rápido.
+ */
+export const checkins = pgTable(
+  "checkins",
+  {
+    id: serial("id").primaryKey(),
+    eventoId: integer("evento_id")
+      .notNull()
+      .references(() => eventos.id, { onDelete: "cascade" }),
+    invitadoId: integer("invitado_id")
+      .notNull()
+      .references(() => invitados.id, { onDelete: "cascade" }),
+    registradoEn: timestamp("registrado_en", { withTimezone: true }).notNull().defaultNow(),
+    tipo: tipoCheckinEnum("tipo").notNull(),
+    /** Hora que tenía antes, si es una corrección confirmada de un doble ingreso. */
+    horaAnterior: timestamp("hora_anterior", { withTimezone: true }),
+    usuarioId: integer("usuario_id").references(() => usuarios.id, { onDelete: "set null" }),
+    dispositivo: text("dispositivo"),
+    /**
+     * La genera el celular por cada toque de "Registrar ingreso". Si se corta la red y el pedido se
+     * reintenta, llega con la misma clave y no se registra dos veces.
+     */
+    claveIdempotencia: text("clave_idempotencia").notNull().unique(),
+  },
+  (t) => [
+    index("checkins_evento_registrado_idx").on(t.eventoId, t.registradoEn),
+    index("checkins_invitado_idx").on(t.invitadoId),
+  ],
+);
+
 export type Evento = typeof eventos.$inferSelect;
 export type Invitado = typeof invitados.$inferSelect;
 export type Usuario = typeof usuarios.$inferSelect;

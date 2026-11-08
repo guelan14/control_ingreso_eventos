@@ -29,6 +29,17 @@ Unicidad dentro de cada evento: el DNI cuando está cargado; nombre + empresa cu
 
 **sesiones**: `id` (hash del token de la cookie), `usuario_id`, `expira_en`.
 
+**checkins** (solo se agregan filas): `id`, `evento_id`, `invitado_id`, `registrado_en`, `tipo` (ingreso / corrección), `hora_anterior?`, `usuario_id`, `dispositivo`, `clave_idempotencia` (única). `invitados.checkin_en` es la copia de la hora vigente, para que buscar y contar sea rápido (recomendación C2 del Análisis #1).
+
+## 3 ter. Check-in en puerta (C2)
+
+- **Hora del servidor**, no del celular: los relojes de los dispositivos no coinciden.
+- **Doble ingreso**: avisa la hora anterior y no la cambia. Corregirla exige confirmar y queda como fila `correccion` con la hora que tenía.
+- **Dos celulares a la vez** con la misma persona: la fila del invitado se bloquea dentro de la transacción y entra uno solo.
+- **Cortes de red** (tarea 21): cada toque genera una clave única; el pedido se guarda en el dispositivo antes de enviarse y se reintenta solo. El servidor reconoce la clave y no registra dos veces.
+- **Premiado**: alerta roja a pantalla completa con vibración, que no se cierra sola (un premiado no puede pasar desapercibido). Si avisó que no venía, se permite el ingreso con aviso (D5).
+- Pendiente: alta rápida en la puerta de quien no está en la lista, con "acompaña a" (D6), y check-in por QR (tarea 23).
+
 ## 3 bis. Usuarios y roles (C1)
 
 Roles según quién usa cada pantalla (D3, D8, D11):
@@ -72,7 +83,7 @@ El cambio se hizo antes de construir el check-in, cuando solo afectaba la capa d
 ## 5. Buenas prácticas aplicadas
 
 - Lógica de negocio separada de la API y de la UI (`src/lib`), con funciones puras testeables.
-- 56 tests automáticos (validación, importación, reimportación, DNI, eventos, filtros, límites de archivo, login, sesiones, bloqueo, permisos).
+- 67 tests automáticos (validación, importación, reimportación, DNI, eventos, filtros, límites de archivo, login, sesiones, bloqueo, permisos, check-in, doble ingreso, reintentos, concurrencia).
 - CI en GitHub Actions: lint + typecheck + tests + build en cada push.
 - Errores de API con formato uniforme; errores internos se loguean y no exponen detalles.
 - Consultas parametrizadas (sin inyección SQL); listado paginado.
@@ -90,7 +101,9 @@ El cambio se hizo antes de construir el check-in, cuando solo afectaba la capa d
 | Correcciones del Análisis #1: A1, A2 (parcial, con DNI), A4, A5 (paginado), M1, M4 | ✅ |
 | Alta de eventos y rubros (API y pantalla) | ✅ |
 | Login con usuarios y roles (C1) | ✅ |
-| Check-in con tabla de registros, doble ingreso y alerta de premiado (C2) | Siguiente |
+| Check-in con tabla de registros, doble ingreso, alerta de premiado y reintentos sin red (C2, tareas 04, 09–12, 20, 21) | ✅ |
+| Alta rápida en la puerta con acompañante (D6) | Siguiente |
+| Check-in por QR (tarea 23) | Pendiente |
 | Panel, gestión, QR, alta en puerta con acompañante | Pendiente |
 | Respaldo local (notebook espejo) | Pendiente |
 

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requerirSesion } from "@/lib/auth/dal";
+import { formatearHora } from "@/lib/fechas";
 import { buscarEvento } from "@/lib/eventos/buscar";
 import { filtrosInvitadosSchema, listarInvitados } from "@/lib/invitados/listar";
 
@@ -37,6 +38,7 @@ export default async function Invitados({
     "Cargo",
     "Confirmación",
     "Sector",
+    "Ingreso",
     ...(evento.usaPremiados ? [""] : []),
   ];
 
@@ -82,6 +84,15 @@ export default async function Invitados({
                   <td className="px-3 py-2">{i.cargo ?? "—"}</td>
                   <td className="px-3 py-2">{i.confirmacion}</td>
                   <td className="px-3 py-2">{i.sector ?? "—"}</td>
+                  <td className="px-3 py-2">
+                    {i.checkinEn ? (
+                      <span className="rounded bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
+                        ✓ {formatearHora(i.checkinEn)}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400">—</span>
+                    )}
+                  </td>
                   {evento.usaPremiados && (
                     <td className="px-3 py-2">
                       {i.premiado && (

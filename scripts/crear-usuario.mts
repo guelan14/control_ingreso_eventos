@@ -9,7 +9,7 @@
 import { parseArgs } from "node:util";
 import { crearDbDesdeUrl } from "../src/db/create-db";
 import { ROLES } from "../src/lib/auth/roles";
-import { crearUsuario, nuevoUsuarioSchema, UsuarioDuplicadoError } from "../src/lib/auth/usuarios";
+import { crearUsuario, nuevoUsuarioSchema } from "../src/lib/auth/usuarios";
 
 const { values } = parseArgs({
   options: {
@@ -41,6 +41,6 @@ try {
   console.log("  Se pide cambiarla en el primer ingreso. No se vuelve a mostrar.");
   process.exit(0);
 } catch (error) {
-  console.error(error instanceof UsuarioDuplicadoError ? error.message : error);
+  console.error(error instanceof Error ? error.message : error);
   process.exit(1);
 }

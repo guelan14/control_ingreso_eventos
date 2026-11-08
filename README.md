@@ -34,8 +34,9 @@ producción se usa un Postgres real.
 
 ### Primer usuario
 
-Todo el sistema pide login. El primer administrador se crea desde la terminal (con PGlite, con
-`npm run dev` frenado):
+Todo el sistema pide login. El primer administrador se crea desde la terminal. Con PGlite hay que
+frenar `npm run dev` antes; si está andando, el comando avisa y no hace nada (la carpeta de PGlite no
+admite dos procesos a la vez y se bloquea con `data/pglite.lock`).
 
 ```bash
 npm run usuario:crear -- --usuario admin --nombre "Nombre Apellido" --rol admin
@@ -50,7 +51,7 @@ el administrador desde la pantalla **Usuarios**.
 | --------------- | --------------------------------------------------------------------- |
 | `admin`         | Todo, incluida la gestión de usuarios                                 |
 | `organizador`   | Crear eventos y rubros, importar invitados, ver la lista              |
-| `recepcion`     | Ver eventos y buscar invitados (personal de la puerta)                |
+| `recepcion`     | Ver eventos, buscar invitados y registrar ingresos (la puerta)        |
 
 Los permisos están en un solo lugar: `src/lib/auth/roles.ts`.
 
@@ -105,6 +106,22 @@ Reglas:
 - Homónimos (mismo nombre y empresa) se aceptan solo si ambos tienen DNI.
 - Límites: 5 MB de archivo, 50 MB descomprimido, 5000 filas y 50 columnas.
 
+## Check-in en puerta
+
+En cada evento, **Check-in en puerta** (`/eventos/:id/checkin`), pensado para celular o tablet:
+
+1. Se escribe nombre, apellido o empresa: la lista se filtra mientras se tipea.
+2. Se toca al invitado: aparece su tarjeta (cargo, sector, rubro, si es premiado, si avisó que no venía).
+3. **Registrar ingreso** graba la hora del servidor, quién lo registró y desde qué dispositivo.
+4. Si es **premiado**, la pantalla entera se pone roja (y vibra el celular) hasta tocar "Entendido".
+   Si no, muestra la confirmación y vuelve sola a la búsqueda.
+5. Si ya había ingresado, avisa la hora anterior y no la cambia. Corregirla pide una confirmación
+   explícita y queda registrada como corrección.
+
+Sin red: el ingreso queda guardado en el dispositivo y se reenvía solo cada 5 segundos o al volver la
+conexión. Cada toque lleva una clave única, así que un reintento nunca registra dos veces. Todos los
+ingresos y correcciones quedan en la tabla `checkins`, que nunca se edita ni se borra.
+
 ## API
 
 Todos los endpoints piden sesión (cookie), salvo `/api/salud`. Sin sesión responden `401`; sin el
@@ -119,6 +136,7 @@ permiso del rol, `403`.
 | GET    | `/api/eventos/:id/invitados`       | `q`, `rubroId`, `sector`, `confirmacion`, `premiado=si\|no`, `checkin=si\|no`, `pagina`, `porPagina` |
 | POST   | `/api/eventos/:id/import`          | multipart: `archivo` (.xlsx) y `confirmar=true` para grabar. Sin `confirmar` solo valida |
 | GET    | `/api/eventos/:id/plantilla`       | Plantilla Excel del evento                                      |
+| POST   | `/api/eventos/:id/checkin`         | `{ invitadoId, clave, corregir? }` → `201` registrado, `200` reintento ya registrado, `409` ya había ingresado (con la hora) |
 | GET    | `/api/salud`                       | Healthcheck                                                     |
 
 La búsqueda `q` encuentra palabras en cualquier orden ("Pérez Juan" encuentra a "Juan Pérez") y busca
@@ -147,12 +165,13 @@ src/
   db/               esquema Drizzle y conexión a Postgres
   lib/
     auth/           roles y permisos, contraseñas, sesiones, usuarios
+    checkin/        registro de ingresos
     eventos/        eventos y rubros
     importacion/    lectura del Excel, validación, importación
     invitados/      constantes, normalización, consultas
 drizzle/            migraciones SQL (versionadas)
 scripts/            migraciones en el deploy y generación de Excels
-tests/              tests de validación, importación y login
+tests/              tests de validación, importación, login y check-in
 ejemplos/           Excel de prueba
 ```
 

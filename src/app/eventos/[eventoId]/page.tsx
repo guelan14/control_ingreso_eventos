@@ -12,6 +12,9 @@ export default async function DetalleEvento({ params }: PageProps<"/eventos/[eve
   const { evento } = encontrado;
 
   const acciones = [
+    ...(puede(sesion.rol, "checkin:registrar")
+      ? [{ href: `/eventos/${evento.id}/checkin`, titulo: "Check-in en puerta", detalle: "Registrar ingresos desde el celular o la tablet" }]
+      : []),
     ...(puede(sesion.rol, "invitados:importar")
       ? [{ href: `/eventos/${evento.id}/importar`, titulo: "Importar invitados", detalle: "Excel con validación previa" }]
       : []),

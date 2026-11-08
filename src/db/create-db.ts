@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
@@ -21,11 +22,48 @@ export function crearDbPostgres(url: string): Db {
   return drizzlePg(pool, { schema });
 }
 
+function procesoVivo(pid: number) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === "EPERM";
+  }
+}
+
+/**
+ * PGlite no impide que dos procesos abran la misma carpeta, y si pasa, uno pisa los datos del otro
+ * (por ejemplo `npm run usuario:crear` con `npm run dev` andando). Este archivo de bloqueo lo evita.
+ */
+function bloquearCarpeta(carpeta: string) {
+  const archivo = `${path.resolve(carpeta)}.lock`;
+  try {
+    const pid = Number(fs.readFileSync(archivo, "utf8"));
+    if (pid && pid !== process.pid && procesoVivo(pid)) {
+      throw new Error(
+        `La base PGlite "${carpeta}" ya está abierta por otro proceso (PID ${pid}), probablemente ` +
+          "`npm run dev`. Frénelo (Ctrl+C) y vuelva a intentar.",
+      );
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
+  fs.mkdirSync(path.dirname(archivo), { recursive: true });
+  fs.writeFileSync(archivo, String(process.pid));
+  // Si el proceso termina de golpe el archivo queda, pero su PID ya no existe y se ignora.
+  process.once("exit", () => {
+    try {
+      if (fs.readFileSync(archivo, "utf8") === String(process.pid)) fs.rmSync(archivo);
+    } catch {}
+  });
+}
+
 /**
  * Postgres embebido (PGlite), sin instalar nada: para tests (en memoria) y desarrollo sin Docker.
  * Aplica las migraciones al abrir.
  */
 export async function crearDbPglite(carpeta?: string): Promise<Db> {
+  if (carpeta) bloquearCarpeta(carpeta);
   const db = drizzlePglite(new PGlite(carpeta), { schema });
   await migratePglite(db, { migrationsFolder: MIGRATIONS_DIR });
   return db;

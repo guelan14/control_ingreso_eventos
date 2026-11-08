@@ -15,6 +15,13 @@
       "when": 1793883925301,
       "tag": "0001_usuarios_y_sesiones",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794105571328,
+      "tag": "0002_checkins",
+      "breakpoints": true
     }
   ]
 }
