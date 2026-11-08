@@ -19,6 +19,8 @@ export const PERMISOS = {
   "eventos:gestionar": ["admin", "organizador"],
   "invitados:ver": ["admin", "organizador", "recepcion"],
   "invitados:importar": ["admin", "organizador"],
+  /** D3: la carga y edición de la lista la hace el equipo de invitaciones (organizadores). */
+  "invitados:editar": ["admin", "organizador"],
   "checkin:registrar": ["admin", "organizador", "recepcion"],
   /** D3: los organizadores siguen los ingresos con nombres; en la puerta no se ve el panel. */
   "panel:ver": ["admin", "organizador"],

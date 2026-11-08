@@ -50,7 +50,7 @@ el administrador desde la pantalla **Usuarios**.
 | Rol             | Puede                                                                 |
 | --------------- | --------------------------------------------------------------------- |
 | `admin`         | Todo, incluida la gestión de usuarios                                 |
-| `organizador`   | Crear eventos y rubros, importar invitados, ver la lista y el panel   |
+| `organizador`   | Crear eventos y rubros, importar, dar de alta y editar invitados, ver el panel |
 | `recepcion`     | Ver eventos, buscar invitados y registrar ingresos (la puerta)        |
 
 Los permisos están en un solo lugar: `src/lib/auth/roles.ts`.
@@ -122,6 +122,18 @@ Sin red: el ingreso queda guardado en el dispositivo y se reenvía solo cada 5 s
 conexión. Cada toque lleva una clave única, así que un reintento nunca registra dos veces. Todos los
 ingresos y correcciones quedan en la tabla `checkins`, que nunca se edita ni se borra.
 
+## Gestión de invitados
+
+En cada evento, **Lista de invitados** (`/eventos/:id/invitados`):
+
+- Tabla paginada; quien ya ingresó aparece resaltado en verde con la hora.
+- Filtros combinables: búsqueda, confirmación, sector, rubro, si ingresó y si es premiado.
+- Cada nombre abre su ficha, con el historial de ingresos (quién los registró y cuándo).
+- Organizadores y administradores pueden **editar** confirmación, sector, premiado, rubro y cargo (lo
+  demás no se toca), y dar de **alta** un invitado a mano con validación.
+- No se eliminan invitados (si hace falta, se reimporta el Excel) y la hora de ingreso no se edita:
+  solo la registra el check-in.
+
 ## Panel en vivo
 
 En cada evento, **Panel en vivo** (`/eventos/:id/panel`), para organizadores y administradores. Se
@@ -147,6 +159,9 @@ permiso del rol, `403`.
 | GET    | `/api/eventos/:id`                 | El evento con sus rubros                                        |
 | POST   | `/api/eventos/:id/rubros`          | Agregar un rubro: `{ nombre }`                                  |
 | GET    | `/api/eventos/:id/invitados`       | `q`, `rubroId`, `sector`, `confirmacion`, `premiado=si\|no`, `checkin=si\|no`, `pagina`, `porPagina` |
+| POST   | `/api/eventos/:id/invitados`       | Alta manual: `{ nombreApellido, empresa, confirmacion, rubroId?, premiado?, cargo?, dni?, sector? }` |
+| GET    | `/api/eventos/:id/invitados/:invId` | Ficha del invitado con su historial de ingresos                |
+| PATCH  | `/api/eventos/:id/invitados/:invId` | Editar `{ confirmacion?, sector?, premiado?, cargo?, rubroId? }` (también `PUT`). La hora de ingreso no se acepta |
 | POST   | `/api/eventos/:id/import`          | multipart: `archivo` (.xlsx) y `confirmar=true` para grabar. Sin `confirmar` solo valida |
 | GET    | `/api/eventos/:id/plantilla`       | Plantilla Excel del evento                                      |
 | GET    | `/api/eventos/:id/panel`           | Totales, premiados pendientes, desglose por rubro y últimos 15 ingresos |
@@ -186,7 +201,7 @@ src/
     invitados/      constantes, normalización, consultas
 drizzle/            migraciones SQL (versionadas)
 scripts/            migraciones en el deploy y generación de Excels
-tests/              tests de validación, importación, login, check-in y panel
+tests/              tests de validación, importación, login, check-in, panel y gestión
 ejemplos/           Excel de prueba
 ```
 

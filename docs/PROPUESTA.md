@@ -49,6 +49,14 @@ Unicidad dentro de cada evento: el DNI cuando está cargado; nombre + empresa cu
 - Se consulta cada 15 segundos (4 consultas por evento, ~20 ms con 320 invitados). Sin red muestra los últimos datos con aviso.
 - Solo organizadores y administradores (D3: en la puerta no se ve el panel).
 
+## 3 quinquies. Gestión de invitados (tareas 05, 06, 17–19)
+
+- **Filtros combinados** en pantalla (búsqueda, confirmación, sector, rubro, ingreso, premiado), sobre la misma consulta de la API.
+- **Edición parcial**: solo cambian los campos enviados (confirmación, sector, premiado, rubro, cargo); el resto queda igual. Mandar la hora de ingreso u otro campo es un error, no se ignora en silencio.
+- **Alta manual** con las mismas reglas que la importación: obligatorios, DNI válido, rubro del evento, y homónimos solo con DNI.
+- **Ficha** con el historial de ingresos de la tabla `checkins`.
+- Sin borrado y sin editar la hora de ingreso, como pide el documento. Editar y dar de alta: organizadores y administradores (D3).
+
 ## 3 bis. Usuarios y roles (C1)
 
 Roles según quién usa cada pantalla (D3, D8, D11):
@@ -92,7 +100,7 @@ El cambio se hizo antes de construir el check-in, cuando solo afectaba la capa d
 ## 5. Buenas prácticas aplicadas
 
 - Lógica de negocio separada de la API y de la UI (`src/lib`), con funciones puras testeables.
-- 77 tests automáticos (validación, importación, reimportación, DNI, eventos, filtros, límites de archivo, login, sesiones, bloqueo, permisos, check-in, doble ingreso, reintentos, concurrencia, panel).
+- 91 tests automáticos (validación, importación, reimportación, DNI, eventos, filtros, límites de archivo, login, sesiones, bloqueo, permisos, check-in, doble ingreso, reintentos, concurrencia, panel, alta y edición).
 - CI en GitHub Actions: lint + typecheck + tests + build en cada push.
 - Errores de API con formato uniforme; errores internos se loguean y no exponen detalles.
 - Consultas parametrizadas (sin inyección SQL); listado paginado.
@@ -114,7 +122,7 @@ El cambio se hizo antes de construir el check-in, cuando solo afectaba la capa d
 | Alta rápida en la puerta con acompañante (D6) | Pendiente |
 | Check-in por QR (tarea 23) | Pendiente |
 | Panel en vivo (tareas 13–16) | ✅ |
-| Gestión: filtros en pantalla, edición y alta manual (tareas 05, 06, 17–19) | Siguiente |
+| Gestión: filtros en pantalla, edición y alta manual (tareas 05, 06, 17–19) | ✅ |
 | Respaldo local (notebook espejo) | Pendiente |
 
 ## 7. Preguntas pendientes para Misiones Online
