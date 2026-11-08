@@ -40,6 +40,15 @@ Unicidad dentro de cada evento: el DNI cuando está cargado; nombre + empresa cu
 - **Premiado**: alerta roja a pantalla completa con vibración, que no se cierra sola (un premiado no puede pasar desapercibido). Si avisó que no venía, se permite el ingreso con aviso (D5).
 - Pendiente: alta rápida en la puerta de quien no está en la lista, con "acompaña a" (D6), y check-in por QR (tarea 23).
 
+## 3 quater. Panel en vivo (tareas 13–16)
+
+- **Dos indicadores** (D7): ingresados sobre confirmados e ingresados sobre invitaciones enviadas, en porcentaje y en número.
+- **Premiados pendientes** primero, en rojo; mensaje verde cuando entraron todos. Los que marcaron "No Puede" van en una sección aparte (D5); si llegan igual, salen de la lista.
+- **Desglose por rubro** sobre los confirmados de cada rubro, con barra de progreso.
+- **Últimos 15 ingresos** desde la tabla `checkins`, con hora exacta y las correcciones marcadas.
+- Se consulta cada 15 segundos (4 consultas por evento, ~20 ms con 320 invitados). Sin red muestra los últimos datos con aviso.
+- Solo organizadores y administradores (D3: en la puerta no se ve el panel).
+
 ## 3 bis. Usuarios y roles (C1)
 
 Roles según quién usa cada pantalla (D3, D8, D11):
@@ -83,7 +92,7 @@ El cambio se hizo antes de construir el check-in, cuando solo afectaba la capa d
 ## 5. Buenas prácticas aplicadas
 
 - Lógica de negocio separada de la API y de la UI (`src/lib`), con funciones puras testeables.
-- 67 tests automáticos (validación, importación, reimportación, DNI, eventos, filtros, límites de archivo, login, sesiones, bloqueo, permisos, check-in, doble ingreso, reintentos, concurrencia).
+- 77 tests automáticos (validación, importación, reimportación, DNI, eventos, filtros, límites de archivo, login, sesiones, bloqueo, permisos, check-in, doble ingreso, reintentos, concurrencia, panel).
 - CI en GitHub Actions: lint + typecheck + tests + build en cada push.
 - Errores de API con formato uniforme; errores internos se loguean y no exponen detalles.
 - Consultas parametrizadas (sin inyección SQL); listado paginado.
@@ -102,9 +111,10 @@ El cambio se hizo antes de construir el check-in, cuando solo afectaba la capa d
 | Alta de eventos y rubros (API y pantalla) | ✅ |
 | Login con usuarios y roles (C1) | ✅ |
 | Check-in con tabla de registros, doble ingreso, alerta de premiado y reintentos sin red (C2, tareas 04, 09–12, 20, 21) | ✅ |
-| Alta rápida en la puerta con acompañante (D6) | Siguiente |
+| Alta rápida en la puerta con acompañante (D6) | Pendiente |
 | Check-in por QR (tarea 23) | Pendiente |
-| Panel, gestión, QR, alta en puerta con acompañante | Pendiente |
+| Panel en vivo (tareas 13–16) | ✅ |
+| Gestión: filtros en pantalla, edición y alta manual (tareas 05, 06, 17–19) | Siguiente |
 | Respaldo local (notebook espejo) | Pendiente |
 
 ## 7. Preguntas pendientes para Misiones Online

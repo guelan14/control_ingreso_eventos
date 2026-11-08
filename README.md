@@ -50,7 +50,7 @@ el administrador desde la pantalla **Usuarios**.
 | Rol             | Puede                                                                 |
 | --------------- | --------------------------------------------------------------------- |
 | `admin`         | Todo, incluida la gestión de usuarios                                 |
-| `organizador`   | Crear eventos y rubros, importar invitados, ver la lista              |
+| `organizador`   | Crear eventos y rubros, importar invitados, ver la lista y el panel   |
 | `recepcion`     | Ver eventos, buscar invitados y registrar ingresos (la puerta)        |
 
 Los permisos están en un solo lugar: `src/lib/auth/roles.ts`.
@@ -122,6 +122,19 @@ Sin red: el ingreso queda guardado en el dispositivo y se reenvía solo cada 5 s
 conexión. Cada toque lleva una clave única, así que un reintento nunca registra dos veces. Todos los
 ingresos y correcciones quedan en la tabla `checkins`, que nunca se edita ni se borra.
 
+## Panel en vivo
+
+En cada evento, **Panel en vivo** (`/eventos/:id/panel`), para organizadores y administradores. Se
+actualiza solo cada 15 segundos, tiene botón "Actualizar ahora", y si se corta la red sigue mostrando
+los últimos datos con un aviso.
+
+1. Ingresados (número grande), porcentaje sobre confirmados y sobre invitaciones enviadas, y cuántos
+   confirmados faltan.
+2. **Premiados que todavía no ingresaron**, en rojo. Cuando entraron todos, un mensaje verde. Aparte,
+   los premiados que avisaron que no vienen.
+3. Ingresos por rubro, con barra de progreso sobre los confirmados de cada rubro.
+4. Los últimos 15 ingresos con nombre, empresa y hora exacta.
+
 ## API
 
 Todos los endpoints piden sesión (cookie), salvo `/api/salud`. Sin sesión responden `401`; sin el
@@ -136,6 +149,7 @@ permiso del rol, `403`.
 | GET    | `/api/eventos/:id/invitados`       | `q`, `rubroId`, `sector`, `confirmacion`, `premiado=si\|no`, `checkin=si\|no`, `pagina`, `porPagina` |
 | POST   | `/api/eventos/:id/import`          | multipart: `archivo` (.xlsx) y `confirmar=true` para grabar. Sin `confirmar` solo valida |
 | GET    | `/api/eventos/:id/plantilla`       | Plantilla Excel del evento                                      |
+| GET    | `/api/eventos/:id/panel`           | Totales, premiados pendientes, desglose por rubro y últimos 15 ingresos |
 | POST   | `/api/eventos/:id/checkin`         | `{ invitadoId, clave, corregir? }` → `201` registrado, `200` reintento ya registrado, `409` ya había ingresado (con la hora) |
 | GET    | `/api/salud`                       | Healthcheck                                                     |
 
@@ -166,12 +180,13 @@ src/
   lib/
     auth/           roles y permisos, contraseñas, sesiones, usuarios
     checkin/        registro de ingresos
+    panel/          métricas del panel en vivo
     eventos/        eventos y rubros
     importacion/    lectura del Excel, validación, importación
     invitados/      constantes, normalización, consultas
 drizzle/            migraciones SQL (versionadas)
 scripts/            migraciones en el deploy y generación de Excels
-tests/              tests de validación, importación, login y check-in
+tests/              tests de validación, importación, login, check-in y panel
 ejemplos/           Excel de prueba
 ```
 

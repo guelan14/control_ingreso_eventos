@@ -20,6 +20,8 @@ export const PERMISOS = {
   "invitados:ver": ["admin", "organizador", "recepcion"],
   "invitados:importar": ["admin", "organizador"],
   "checkin:registrar": ["admin", "organizador", "recepcion"],
+  /** D3: los organizadores siguen los ingresos con nombres; en la puerta no se ve el panel. */
+  "panel:ver": ["admin", "organizador"],
   "usuarios:gestionar": ["admin"],
 } as const satisfies Record<string, readonly Rol[]>;
 
