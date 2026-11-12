@@ -18,7 +18,10 @@ export type Panel = {
   totales: {
     invitados: number;
     confirmados: number;
+    /** Todos los que entraron, incluidos los que no estaban en la lista. */
     ingresados: number;
+    /** Entraron sin estar en la lista (D6). Ya están sumados en `ingresados`. */
+    sinLista: number;
     /** Confirmados que todavía no llegaron. */
     faltan: number;
   };
@@ -37,6 +40,7 @@ export type Panel = {
     empresa: string;
     premiado: boolean;
     tipo: "ingreso" | "correccion";
+    origen: "lista" | "puerta";
     /** ISO */
     registradoEn: string;
   }[];

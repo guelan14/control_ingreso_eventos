@@ -12,7 +12,7 @@ import { claveInvitado, limpiarTexto, normalizarDni } from "./normalizar";
  * - La hora de ingreso no se edita acá: solo la registra el check-in.
  */
 
-const textoRequerido = (min: number, max: number) =>
+export const textoRequerido = (min: number, max: number) =>
   z
     .string()
     .max(max)
@@ -20,14 +20,14 @@ const textoRequerido = (min: number, max: number) =>
     .pipe(z.string().min(min));
 
 /** undefined = no tocar; "" o null = borrar el dato. */
-const textoOpcional = (max: number) =>
+export const textoOpcional = (max: number) =>
   z
     .string()
     .max(max)
     .nullish()
     .transform((v) => (v === undefined ? undefined : limpiarTexto(v)));
 
-const dniOpcional = z
+export const dniOpcional = z
   .string()
   .max(30)
   .nullish()
@@ -103,7 +103,7 @@ function validarSegunEvento(
   }
 }
 
-function esViolacionUnica(error: unknown): boolean {
+export function esViolacionUnica(error: unknown): boolean {
   const e = error as { code?: string; cause?: { code?: string } };
   return e?.code === "23505" || e?.cause?.code === "23505";
 }
@@ -186,6 +186,9 @@ export async function obtenerInvitado(db: Db, eventoId: number, invitadoId: numb
       premiado: invitados.premiado,
       sector: invitados.sector,
       checkinEn: invitados.checkinEn,
+      origen: invitados.origen,
+      acompanaA: invitados.acompanaA,
+      codigo: invitados.codigo,
       creadoEn: invitados.creadoEn,
       actualizadoEn: invitados.actualizadoEn,
     })

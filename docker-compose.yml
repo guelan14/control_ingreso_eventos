@@ -1,19 +1,36 @@
-# Postgres para desarrollo local: npm run db:up
+# Desarrollo:  npm run db:up                      (solo Postgres; la app con npm run dev)
+# Producción:  docker compose up -d --build       (Postgres + la app en http://localhost:3000)
+#              docker compose exec app npm run usuario:crear -- --usuario admin --nombre "Nombre" --rol admin
 services:
   postgres:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: eventos
-      POSTGRES_PASSWORD: eventos
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-eventos}
       POSTGRES_DB: eventos
     ports:
-      - "5432:5432"
+      - "${PUERTO_POSTGRES:-5432}:5432"
     volumes:
       - postgres-datos:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U eventos"]
       interval: 5s
       retries: 10
+    restart: unless-stopped
+
+  app:
+    build: .
+    environment:
+      DATABASE_URL: postgres://eventos:${POSTGRES_PASSWORD:-eventos}@postgres:5432/eventos
+      IMPORT_MAX_MB: ${IMPORT_MAX_MB:-5}
+      # Detrás de HTTPS, true. En la red local por http:// (respaldo del evento), false.
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+    ports:
+      - "${PUERTO_APP:-3000}:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
 
 volumes:
   postgres-datos:

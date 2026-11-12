@@ -17,6 +17,7 @@ export default async function Invitados({ params, searchParams }: PageProps<"/ev
   if (!encontrado) notFound();
   const { db, evento } = encontrado;
   const edita = puede(sesion.rol, "invitados:editar");
+  const exporta = puede(sesion.rol, "datos:exportar");
 
   // Solo los parámetros con valor: un <select> en "Todos" manda "" y no es un filtro.
   const consulta = await searchParams;
@@ -57,11 +58,21 @@ export default async function Invitados({ params, searchParams }: PageProps<"/ev
         <h1 className="text-2xl font-bold">
           Invitados · {evento.nombre} ({total})
         </h1>
-        {edita && (
-          <Link href={`${base}/nuevo`} className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white">
-            Nuevo invitado
-          </Link>
-        )}
+        <div className="flex flex-wrap gap-2">
+          {exporta && (
+            <a
+              href={`/api/eventos/${evento.id}/exportar?lista=todos`}
+              className="rounded-md border bg-white px-4 py-2 text-sm font-medium hover:bg-slate-50"
+            >
+              Exportar a Excel
+            </a>
+          )}
+          {edita && (
+            <Link href={`${base}/nuevo`} className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white">
+              Nuevo invitado
+            </Link>
+          )}
+        </div>
       </div>
 
       <form className="flex flex-wrap items-end gap-2 rounded-lg border bg-white p-3">
@@ -157,6 +168,9 @@ export default async function Invitados({ params, searchParams }: PageProps<"/ev
                     <Link href={`${base}/${i.id}`} className="text-blue-800 hover:underline">
                       {i.nombreApellido}
                     </Link>
+                    {i.origen === "puerta" && (
+                      <span className="block text-xs font-normal text-slate-500">Sin lista · acompaña a {i.acompanaA}</span>
+                    )}
                   </td>
                   <td className="px-3 py-2">{i.empresa}</td>
                   {evento.usaRubros && <td className="px-3 py-2">{i.rubro ?? "—"}</td>}

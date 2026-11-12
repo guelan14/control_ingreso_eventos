@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { formatearHora } from "@/lib/fechas";
-import { ColaPendientes, nuevaClave, type Pendiente } from "./cola";
+import { ColaPendientes, nuevaClave, type DatosAlta, type Pendiente } from "./cola";
+import { EscanerQr } from "./escaner-qr";
 
 type Invitado = {
   id: number;
@@ -14,11 +15,15 @@ type Invitado = {
   premiado: boolean;
   confirmacion: "Confirmado" | "No Puede";
   checkinEn: string | null;
+  origen: "lista" | "puerta";
+  acompanaA: string | null;
 };
 
 type Envio =
   | { tipo: "registrado"; invitado: Invitado }
   | { tipo: "ya_ingresado"; invitado: Invitado }
+  /** Alta en la puerta de alguien que ya estaba cargado: se registra por la vía normal. */
+  | { tipo: "existe"; invitado: Invitado }
   /** El servidor lo rechazó por un motivo que no se arregla reintentando. */
   | { tipo: "rechazado"; mensaje: string }
   /** Sin red, servidor caído o sesión vencida: queda en la cola y se reintenta. */
@@ -26,29 +31,57 @@ type Envio =
 
 type Vista =
   | { tipo: "busqueda" }
+  | { tipo: "escaner" }
+  | { tipo: "alta"; nombreInicial: string }
   | { tipo: "tarjeta"; invitado: Invitado; confirmandoCorreccion: boolean }
   | { tipo: "exito"; invitado: Invitado; hora: string; pendiente: boolean };
 
 const ESPERA_REINTENTO_MS = 5000;
 const VUELTA_AUTOMATICA_MS = 2500;
+const VIBRACION_PREMIADO = [400, 150, 400, 150, 800];
 
 async function enviar(eventoId: number, p: Pendiente): Promise<Envio> {
   try {
-    const r = await fetch(`/api/eventos/${eventoId}/checkin`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ invitadoId: p.invitadoId, clave: p.clave, corregir: p.corregir }),
-      signal: AbortSignal.timeout(8000),
-    });
+    const r = p.alta
+      ? await fetch(`/api/eventos/${eventoId}/checkin/alta`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...p.alta, clave: p.clave }),
+          signal: AbortSignal.timeout(8000),
+        })
+      : await fetch(`/api/eventos/${eventoId}/checkin`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ invitadoId: p.invitadoId, clave: p.clave, corregir: p.corregir }),
+          signal: AbortSignal.timeout(8000),
+        });
     const cuerpo = await r.json().catch(() => null);
     if (r.ok) return { tipo: "registrado", invitado: cuerpo.invitado };
-    if (r.status === 409) return { tipo: "ya_ingresado", invitado: cuerpo.invitado };
+    if (r.status === 409 && cuerpo?.estado === "ya_ingresado") return { tipo: "ya_ingresado", invitado: cuerpo.invitado };
+    if (r.status === 409 && cuerpo?.estado === "existe") return { tipo: "existe", invitado: cuerpo.invitado };
     if (r.status === 401) return { tipo: "reintentar", sesionVencida: true };
     if (r.status >= 500 || r.status === 408 || r.status === 429) return { tipo: "reintentar", sesionVencida: false };
     return { tipo: "rechazado", mensaje: cuerpo?.error?.mensaje ?? `Error ${r.status}` };
   } catch {
     return { tipo: "reintentar", sesionVencida: false };
   }
+}
+
+/** Datos locales para mostrar el éxito de un alta que quedó pendiente de enviar (sin red). */
+function invitadoDeAlta(a: DatosAlta): Invitado {
+  return {
+    id: 0,
+    nombreApellido: a.nombreApellido,
+    empresa: a.empresa || "(no indicada)",
+    cargo: null,
+    sector: null,
+    rubro: null,
+    premiado: false,
+    confirmacion: "Confirmado",
+    checkinEn: null,
+    origen: "puerta",
+    acompanaA: a.acompanaA,
+  };
 }
 
 export function PantallaCheckin({ eventoId, nombreEvento }: { eventoId: number; nombreEvento: string }) {
@@ -116,6 +149,8 @@ export function PantallaCheckin({ eventoId, nombreEvento }: { eventoId: number; 
         setSesionVencida(false);
         if (r.tipo === "ya_ingresado") {
           avisar(`${p.nombre} ya había ingresado a las ${formatearHora(r.invitado.checkinEn!)}. No se cambió la hora.`);
+        } else if (r.tipo === "existe") {
+          avisar(`${p.nombre} ya estaba cargado en el evento: búsquelo y registre su ingreso.`);
         } else if (r.tipo === "rechazado") {
           avisar(`No se pudo registrar a ${p.nombre}: ${r.mensaje}`);
         }
@@ -142,16 +177,9 @@ export function PantallaCheckin({ eventoId, nombreEvento }: { eventoId: number; 
     return () => clearTimeout(t);
   }, [vista, volver]);
 
-  const registrar = async (invitado: Invitado, corregir: boolean) => {
+  /** Registra (o da de alta y registra). Primero va a la cola: si la página se cierra, no se pierde. */
+  const procesar = async (pendiente: Pendiente, local: Invitado) => {
     if (enviando) return;
-    const pendiente: Pendiente = {
-      clave: nuevaClave(),
-      invitadoId: invitado.id,
-      nombre: invitado.nombreApellido,
-      corregir,
-      creadoEn: Date.now(),
-    };
-    // Primero a la cola: si la página se cierra a mitad del envío, no se pierde.
     cola.agregar(pendiente);
     setEnviando(true);
     const r = await enviar(eventoId, pendiente);
@@ -159,19 +187,47 @@ export function PantallaCheckin({ eventoId, nombreEvento }: { eventoId: number; 
 
     if (r.tipo === "reintentar") {
       setSesionVencida(r.sesionVencida);
-      if (invitado.premiado) navigator.vibrate?.([400, 150, 400, 150, 800]);
-      setVista({ tipo: "exito", invitado, hora: formatearHora(new Date()), pendiente: true });
+      if (local.premiado) navigator.vibrate?.(VIBRACION_PREMIADO);
+      setVista({ tipo: "exito", invitado: local, hora: formatearHora(new Date()), pendiente: true });
       return;
     }
     cola.quitar(pendiente.clave);
     setSesionVencida(false);
     if (r.tipo === "registrado") {
-      if (r.invitado.premiado) navigator.vibrate?.([400, 150, 400, 150, 800]);
+      if (r.invitado.premiado) navigator.vibrate?.(VIBRACION_PREMIADO);
       setVista({ tipo: "exito", invitado: r.invitado, hora: formatearHora(r.invitado.checkinEn!), pendiente: false });
-    } else if (r.tipo === "ya_ingresado") {
+    } else if (r.tipo === "ya_ingresado" || r.tipo === "existe") {
+      if (r.tipo === "existe") avisar(`${r.invitado.nombreApellido} ya estaba cargado: se muestra su tarjeta.`);
       setVista({ tipo: "tarjeta", invitado: r.invitado, confirmandoCorreccion: false });
     } else {
       avisar(r.mensaje);
+    }
+  };
+
+  const registrar = (invitado: Invitado, corregir: boolean) =>
+    procesar(
+      { clave: nuevaClave(), invitadoId: invitado.id, nombre: invitado.nombreApellido, corregir, creadoEn: Date.now() },
+      invitado,
+    );
+
+  const darDeAlta = (datos: DatosAlta) =>
+    procesar(
+      { clave: nuevaClave(), invitadoId: 0, nombre: datos.nombreApellido, corregir: false, creadoEn: Date.now(), alta: datos },
+      invitadoDeAlta(datos),
+    );
+
+  const leerQr = async (texto: string) => {
+    setVista({ tipo: "busqueda" });
+    try {
+      const r = await fetch(`/api/eventos/${eventoId}/checkin/qr?${new URLSearchParams({ codigo: texto })}`, {
+        signal: AbortSignal.timeout(8000),
+      });
+      const cuerpo = await r.json().catch(() => null);
+      if (r.ok) return setVista({ tipo: "tarjeta", invitado: cuerpo, confirmandoCorreccion: false });
+      if (r.status === 401) return setSesionVencida(true);
+      avisar(cuerpo?.error?.mensaje ?? "No se pudo leer el QR.");
+    } catch {
+      avisar("Sin conexión: el QR no se pudo verificar. Busque al invitado por nombre.");
     }
   };
 
@@ -209,23 +265,31 @@ export function PantallaCheckin({ eventoId, nombreEvento }: { eventoId: number; 
 
       {vista.tipo === "busqueda" && (
         <>
-          <input
-            ref={buscador}
-            autoFocus
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && resultados.length === 1 && textoBuscado) {
-                setVista({ tipo: "tarjeta", invitado: resultados[0], confirmandoCorreccion: false });
-              }
-            }}
-            placeholder="Nombre, apellido o empresa"
-            autoComplete="off"
-            autoCorrect="off"
-            spellCheck={false}
-            enterKeyHint="search"
-            className="w-full rounded-xl border-2 border-slate-300 px-4 py-4 text-xl focus:border-slate-900 focus:outline-none"
-          />
+          <div className="flex gap-2">
+            <input
+              ref={buscador}
+              autoFocus
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && resultados.length === 1 && textoBuscado) {
+                  setVista({ tipo: "tarjeta", invitado: resultados[0], confirmandoCorreccion: false });
+                }
+              }}
+              placeholder="Nombre, apellido o empresa"
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
+              enterKeyHint="search"
+              className="min-w-0 flex-1 rounded-xl border-2 border-slate-300 px-4 py-4 text-xl focus:border-slate-900 focus:outline-none"
+            />
+            <button
+              onClick={() => setVista({ tipo: "escaner" })}
+              className="shrink-0 rounded-xl bg-slate-900 px-4 text-lg font-semibold text-white"
+            >
+              QR
+            </button>
+          </div>
 
           {textoBuscado && (
             <ul className="divide-y overflow-hidden rounded-xl border bg-white">
@@ -240,7 +304,9 @@ export function PantallaCheckin({ eventoId, nombreEvento }: { eventoId: number; 
                   >
                     <span>
                       <span className="block text-lg font-semibold">{i.nombreApellido}</span>
-                      <span className="block text-slate-600">{i.empresa}</span>
+                      <span className="block text-slate-600">
+                        {i.origen === "puerta" ? `Acompaña a ${i.acompanaA}` : i.empresa}
+                      </span>
                     </span>
                     <span className="flex shrink-0 flex-col items-end gap-1">
                       {i.premiado && <span className="rounded bg-red-600 px-2 py-0.5 text-xs font-bold text-white">PREMIADO</span>}
@@ -253,9 +319,25 @@ export function PantallaCheckin({ eventoId, nombreEvento }: { eventoId: number; 
                   </button>
                 </li>
               ))}
+              {!buscando && (
+                <li>
+                  <button
+                    onClick={() => setVista({ tipo: "alta", nombreInicial: q.trim() })}
+                    className="w-full px-4 py-3 text-left font-medium text-blue-800 hover:bg-slate-50"
+                  >
+                    + No está en la lista: dar de alta y registrar
+                  </button>
+                </li>
+              )}
             </ul>
           )}
         </>
+      )}
+
+      {vista.tipo === "escaner" && <EscanerQr onLeido={leerQr} onCerrar={volver} />}
+
+      {vista.tipo === "alta" && (
+        <FormularioAlta nombreInicial={vista.nombreInicial} enviando={enviando} onEnviar={darDeAlta} onCancelar={volver} />
       )}
 
       {vista.tipo === "tarjeta" && (
@@ -272,6 +354,67 @@ export function PantallaCheckin({ eventoId, nombreEvento }: { eventoId: number; 
 
       {vista.tipo === "exito" && <Exito {...vista} onSiguiente={volver} />}
     </div>
+  );
+}
+
+/** D6: datos mínimos de quien llega sin estar en la lista. */
+function FormularioAlta({
+  nombreInicial,
+  enviando,
+  onEnviar,
+  onCancelar,
+}: {
+  nombreInicial: string;
+  enviando: boolean;
+  onEnviar: (datos: DatosAlta) => void;
+  onCancelar: () => void;
+}) {
+  const campo = "w-full rounded-lg border-2 border-slate-300 px-3 py-3 text-lg";
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        const f = new FormData(e.currentTarget);
+        const texto = (k: string) => String(f.get(k) ?? "").trim();
+        onEnviar({ nombreApellido: texto("nombreApellido"), acompanaA: texto("acompanaA"), empresa: texto("empresa"), dni: texto("dni") });
+      }}
+      className="space-y-4 rounded-xl border-2 border-slate-200 bg-white p-5"
+    >
+      <h2 className="text-xl font-bold">Alta en la puerta</h2>
+      <p className="text-sm text-slate-600">Queda marcado como &quot;no estaba en la lista&quot; y se registra su ingreso.</p>
+      <label className="block space-y-1">
+        <span className="font-medium">Nombre y apellido *</span>
+        <input name="nombreApellido" required minLength={3} maxLength={150} defaultValue={nombreInicial} autoFocus className={campo} />
+      </label>
+      <label className="block space-y-1">
+        <span className="font-medium">Acompaña a *</span>
+        <input
+          name="acompanaA"
+          required
+          minLength={2}
+          maxLength={150}
+          placeholder="Ej.: María González (premiada), esposa"
+          className={campo}
+        />
+        <span className="block text-xs text-slate-500">Premiado, cargo o vínculo familiar.</span>
+      </label>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <label className="block space-y-1">
+          <span className="font-medium">Empresa</span>
+          <input name="empresa" maxLength={150} className={campo} />
+        </label>
+        <label className="block space-y-1">
+          <span className="font-medium">DNI</span>
+          <input name="dni" maxLength={30} inputMode="numeric" className={campo} />
+        </label>
+      </div>
+      <button disabled={enviando} className="w-full rounded-xl bg-green-600 py-5 text-xl font-bold text-white disabled:opacity-60">
+        {enviando ? "Registrando…" : "Dar de alta y registrar ingreso"}
+      </button>
+      <button type="button" onClick={onCancelar} className="w-full py-2 text-slate-600 underline">
+        Cancelar
+      </button>
+    </form>
   );
 }
 
@@ -313,8 +456,12 @@ function Tarjeta({
         {dato("Cargo", i.cargo)}
         {dato("Sector", i.sector)}
         {dato("Rubro", i.rubro)}
+        {dato("Acompaña a", i.acompanaA)}
       </dl>
 
+      {i.origen === "puerta" && (
+        <p className="rounded-md bg-slate-100 p-3 text-slate-700">Dado de alta en la puerta: no estaba en la lista.</p>
+      )}
       {i.confirmacion === "No Puede" && (
         <p className="rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-900">
           Avisó que no venía. Se puede registrar igual.
@@ -417,6 +564,7 @@ function Exito({
       <span className="text-5xl">✓</span>
       <span className="text-2xl font-bold">Ingreso registrado</span>
       <span className="text-xl">{i.nombreApellido}</span>
+      {i.origen === "puerta" && <span className="text-lg">Sin lista · acompaña a {i.acompanaA}</span>}
       <span className="text-lg">{[i.sector && `Sector ${i.sector}`, hora].filter(Boolean).join(" · ")}</span>
       {aviso}
       <span className="mt-2 text-sm opacity-80">Tocar para seguir</span>

@@ -13,7 +13,8 @@ Pasantes: Miguel Ángel Neumann y Dana Fleita · Actualizada en noviembre de 202
 | Excel | **ExcelJS** | Lee y escribe .xlsx (incluye listas desplegables en la plantilla). La versión de `xlsx` publicada en npm está desactualizada. |
 | UI | **Tailwind CSS** | Responsive para tablet/celular sin dependencias de componentes pesadas. |
 | Tests | **Vitest + PGlite** | Los tests corren contra un Postgres real en memoria, sin instalar nada. |
-| Deploy | **Entorno de Misiones Online (GitLab)** | Definido en D12. `railway.json` queda para demos. |
+| QR | **qrcode + jsQR** | Generar en el servidor y leer con la cámara desde el navegador. jsQR es JavaScript puro: funciona en Safari de iPhone, donde no existe la API nativa de lectura. |
+| Deploy | **Docker, entorno de Misiones Online (GitLab)** | Definido en D12. La imagen sirve para cualquier entorno; `railway.json` queda para demos. |
 
 ## 2. Modelo de datos
 
@@ -21,7 +22,7 @@ Pasantes: Miguel Ángel Neumann y Dana Fleita · Actualizada en noviembre de 202
 
 **rubros**: `id`, `evento_id`, `nombre`. Cada evento tiene los suyos, porque cambian de un año a otro (D8).
 
-**invitados**: `id`, `evento_id`, `nombre_apellido`, `empresa`, `cargo?`, `dni?`, `rubro_id?`, `confirmacion` (Confirmado / No Puede), `premiado`, `sector?`, `checkin_en?` (solo lo setea el check-in), `clave_nombre` (nombre + empresa normalizados, para buscar e identificar sin DNI).
+**invitados**: `id`, `evento_id`, `nombre_apellido`, `empresa`, `cargo?`, `dni?`, `rubro_id?`, `confirmacion` (Confirmado / No Puede), `premiado`, `sector?`, `checkin_en?` (solo lo setea el check-in), `clave_nombre` (nombre + empresa normalizados, para buscar e identificar sin DNI), `origen` (lista / puerta), `acompana_a?`, `codigo` (16 caracteres al azar, único, para el QR).
 
 Unicidad dentro de cada evento: el DNI cuando está cargado; nombre + empresa cuando no. Así se aceptan homónimos con DNI distinto (D4).
 
@@ -38,7 +39,8 @@ Unicidad dentro de cada evento: el DNI cuando está cargado; nombre + empresa cu
 - **Dos celulares a la vez** con la misma persona: la fila del invitado se bloquea dentro de la transacción y entra uno solo.
 - **Cortes de red** (tarea 21): cada toque genera una clave única; el pedido se guarda en el dispositivo antes de enviarse y se reintenta solo. El servidor reconoce la clave y no registra dos veces.
 - **Premiado**: alerta roja a pantalla completa con vibración, que no se cierra sola (un premiado no puede pasar desapercibido). Si avisó que no venía, se permite el ingreso con aviso (D5).
-- Pendiente: alta rápida en la puerta de quien no está en la lista, con "acompaña a" (D6), y check-in por QR (tarea 23).
+- **Alta en la puerta (D6)**: nombre y "acompaña a" obligatorios; empresa y DNI opcionales. Alta e ingreso en una sola transacción, con la misma clave de reintento. Si la persona ya estaba cargada se muestra su tarjeta en vez de duplicarla. Funciona también sin red.
+- **Check-in por QR (tarea 23)**: el QR lleva solo un código al azar, no datos personales ni una dirección: si se reenvía o se escanea con otra app, no expone a nadie. Un QR de otro evento se rechaza nombrando el evento. La búsqueda por nombre sigue siendo la vía principal (no todos traen el QR).
 
 ## 3 quater. Panel en vivo (tareas 13–16)
 
@@ -46,6 +48,8 @@ Unicidad dentro de cada evento: el DNI cuando está cargado; nombre + empresa cu
 - **Premiados pendientes** primero, en rojo; mensaje verde cuando entraron todos. Los que marcaron "No Puede" van en una sección aparte (D5); si llegan igual, salen de la lista.
 - **Desglose por rubro** sobre los confirmados de cada rubro, con barra de progreso.
 - **Últimos 15 ingresos** desde la tabla `checkins`, con hora exacta y las correcciones marcadas.
+- **Los dados de alta en la puerta** suman a ingresados pero no a confirmados ni a invitaciones (D7); se muestra cuántos son.
+- **Descarga de presentes en Excel** (tarea 24), solo organizadores (D11).
 - Se consulta cada 15 segundos (4 consultas por evento, ~20 ms con 320 invitados). Sin red muestra los últimos datos con aviso.
 - Solo organizadores y administradores (D3: en la puerta no se ve el panel).
 
@@ -64,8 +68,8 @@ Roles según quién usa cada pantalla (D3, D8, D11):
 | Rol | Quién | Puede |
 | --- | --- | --- |
 | Administrador | Sistemas / responsable | Todo, incluida la gestión de usuarios |
-| Organizador | Organización y equipo de invitaciones | Eventos, rubros, importación, lista; luego panel y descargas |
-| Recepción | Personal de la puerta | Ver eventos y buscar invitados; luego registrar ingresos |
+| Organizador | Organización y equipo de invitaciones | Eventos, rubros, importación, lista, panel, QR y descargas |
+| Recepción | Personal de la puerta | Buscar invitados, registrar ingresos (también por QR) y dar de alta en la puerta |
 
 - **Sesiones en la base**, no un token firmado: se pueden cerrar desde el servidor (al desactivar a alguien o si se pierde un celular). Duran 12 horas, una jornada de evento.
 - **Contraseñas con scrypt** (incluido en Node). Las asigna el administrador como temporales y cada uno elige la suya al ingresar.
@@ -100,13 +104,16 @@ El cambio se hizo antes de construir el check-in, cuando solo afectaba la capa d
 ## 5. Buenas prácticas aplicadas
 
 - Lógica de negocio separada de la API y de la UI (`src/lib`), con funciones puras testeables.
-- 91 tests automáticos (validación, importación, reimportación, DNI, eventos, filtros, límites de archivo, login, sesiones, bloqueo, permisos, check-in, doble ingreso, reintentos, concurrencia, panel, alta y edición).
+- 107 tests automáticos (validación, importación, reimportación, DNI, eventos, filtros, límites de archivo, login, sesiones, bloqueo, permisos, check-in, doble ingreso, reintentos, concurrencia, panel, alta y edición, alta en la puerta, QR, exportación y formato de horas).
+- Probado de punta a punta con la imagen Docker contra PostgreSQL 17.
 - CI en GitHub Actions: lint + typecheck + tests + build en cada push.
 - Errores de API con formato uniforme; errores internos se loguean y no exponen detalles.
 - Consultas parametrizadas (sin inyección SQL); listado paginado.
 - Migraciones versionadas; configuración por variables de entorno (`.env.example`).
 - El build no depende de internet (fuente incluida en el repo).
 - Healthcheck `/api/salud` para el deploy.
+- Imagen Docker de varias etapas, sin herramientas de compilación y con usuario sin privilegios; migra al arrancar.
+- Horas siempre en formato de 24 horas y en hora de Argentina, armadas a mano: según la versión del navegador o del servidor, `es-AR` salía como "08:10 p. m.".
 
 ## 6. Estado
 
@@ -119,8 +126,10 @@ El cambio se hizo antes de construir el check-in, cuando solo afectaba la capa d
 | Alta de eventos y rubros (API y pantalla) | ✅ |
 | Login con usuarios y roles (C1) | ✅ |
 | Check-in con tabla de registros, doble ingreso, alerta de premiado y reintentos sin red (C2, tareas 04, 09–12, 20, 21) | ✅ |
-| Alta rápida en la puerta con acompañante (D6) | Pendiente |
-| Check-in por QR (tarea 23) | Pendiente |
+| Alta rápida en la puerta con acompañante (D6) | ✅ |
+| Check-in por QR: generación, ZIP, impresión y lectura con cámara (tarea 23) | ✅ (envío automático por mail/WhatsApp: pregunta 3) |
+| Exportar presentes a Excel (tarea 24) | ✅ |
+| Imagen Docker con migraciones al arrancar | ✅ |
 | Panel en vivo (tareas 13–16) | ✅ |
 | Gestión: filtros en pantalla, edición y alta manual (tareas 05, 06, 17–19) | ✅ |
 | Respaldo local (notebook espejo) | Pendiente |

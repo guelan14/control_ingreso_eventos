@@ -23,6 +23,8 @@ export type InvitadoCheckin = {
   premiado: boolean;
   confirmacion: "Confirmado" | "No Puede";
   checkinEn: Date | null;
+  origen: "lista" | "puerta";
+  acompanaA: string | null;
 };
 
 export type ResultadoCheckin =
@@ -32,7 +34,7 @@ export type ResultadoCheckin =
   | { estado: "ya_ingresado"; invitado: InvitadoCheckin }
   | { estado: "no_encontrado" };
 
-async function invitadoParaCheckin(db: Ejecutor, eventoId: number, invitadoId: number) {
+export async function invitadoParaCheckin(db: Ejecutor, eventoId: number, invitadoId: number) {
   const [fila] = await db
     .select({
       id: invitados.id,
@@ -44,6 +46,8 @@ async function invitadoParaCheckin(db: Ejecutor, eventoId: number, invitadoId: n
       premiado: invitados.premiado,
       confirmacion: invitados.confirmacion,
       checkinEn: invitados.checkinEn,
+      origen: invitados.origen,
+      acompanaA: invitados.acompanaA,
     })
     .from(invitados)
     .leftJoin(rubros, eq(rubros.id, invitados.rubroId))

@@ -11,7 +11,7 @@ Misiones Online 2026.
 
 ## Stack
 
-Next.js 16 (App Router) · TypeScript · PostgreSQL · Drizzle ORM · Zod · Tailwind CSS · Vitest + PGlite · ExcelJS
+Next.js 16 (App Router) · TypeScript · PostgreSQL · Drizzle ORM · Zod · Tailwind CSS · Vitest + PGlite · ExcelJS · qrcode + jsQR · Docker
 
 ## Requisitos
 
@@ -50,8 +50,8 @@ el administrador desde la pantalla **Usuarios**.
 | Rol             | Puede                                                                 |
 | --------------- | --------------------------------------------------------------------- |
 | `admin`         | Todo, incluida la gestión de usuarios                                 |
-| `organizador`   | Crear eventos y rubros, importar, dar de alta y editar invitados, ver el panel |
-| `recepcion`     | Ver eventos, buscar invitados y registrar ingresos (la puerta)        |
+| `organizador`   | Crear eventos y rubros, importar, dar de alta y editar invitados, ver el panel, generar QR y exportar a Excel |
+| `recepcion`     | Ver eventos, buscar invitados, registrar ingresos (también por QR) y dar de alta en la puerta |
 
 Los permisos están en un solo lugar: `src/lib/auth/roles.ts`.
 
@@ -118,7 +118,17 @@ En cada evento, **Check-in en puerta** (`/eventos/:id/checkin`), pensado para ce
 5. Si ya había ingresado, avisa la hora anterior y no la cambia. Corregirla pide una confirmación
    explícita y queda registrada como corrección.
 
-Sin red: el ingreso queda guardado en el dispositivo y se reenvía solo cada 5 segundos o al volver la
+**Por QR:** el botón **QR** abre la cámara trasera; al leer el código aparece la tarjeta del invitado y
+se sigue igual. Si el QR es de otro evento, lo avisa con el nombre del evento. La cámara solo funciona
+por HTTPS (o en `localhost`); si no hay cámara o permiso, se busca por nombre.
+
+**No está en la lista (D6):** al final de los resultados, **No está en la lista: dar de alta y registrar**
+pide nombre, a quién acompaña (premiado, cargo o vínculo), y opcionalmente empresa y DNI. Crea al
+invitado marcado como "sin lista" y registra su ingreso en el mismo paso. Si la persona ya estaba
+cargada (mismo DNI, o mismo nombre y empresa), muestra su tarjeta en vez de duplicarla. En el panel
+suma a los ingresados, pero no a confirmados ni a invitaciones enviadas (D7).
+
+Sin red: el ingreso (o el alta) queda guardado en el dispositivo y se reenvía solo cada 5 segundos o al volver la
 conexión. Cada toque lleva una clave única, así que un reintento nunca registra dos veces. Todos los
 ingresos y correcciones quedan en la tabla `checkins`, que nunca se edita ni se borra.
 
@@ -145,7 +155,17 @@ los últimos datos con un aviso.
 2. **Premiados que todavía no ingresaron**, en rojo. Cuando entraron todos, un mensaje verde. Aparte,
    los premiados que avisaron que no vienen.
 3. Ingresos por rubro, con barra de progreso sobre los confirmados de cada rubro.
-4. Los últimos 15 ingresos con nombre, empresa y hora exacta.
+4. Los últimos 15 ingresos con nombre, empresa y hora exacta; los dados de alta en la puerta, marcados.
+5. **Descargar presentes (Excel)**.
+
+## Códigos QR y exportación
+
+- **Códigos QR** (`/eventos/:id/qr`, organizadores): cada invitado de la lista tiene un código al azar
+  de 16 caracteres. El QR lleva solo ese código, sin datos personales. Se descarga un **ZIP** con un PNG
+  por invitado y `codigos.xlsx` (qué archivo es de quién, para combinar correspondencia por mail o
+  WhatsApp), o se **imprimen tarjetas** (8 por hoja A4). La ficha de cada invitado muestra su QR.
+- **Exportar a Excel** (organizadores, D11): desde el panel, los presentes en orden de llegada; desde la
+  lista de invitados, todos con su estado. Incluye hora de ingreso, si estaba en la lista y a quién acompaña.
 
 ## API
 
@@ -166,6 +186,11 @@ permiso del rol, `403`.
 | GET    | `/api/eventos/:id/plantilla`       | Plantilla Excel del evento                                      |
 | GET    | `/api/eventos/:id/panel`           | Totales, premiados pendientes, desglose por rubro y últimos 15 ingresos |
 | POST   | `/api/eventos/:id/checkin`         | `{ invitadoId, clave, corregir? }` → `201` registrado, `200` reintento ya registrado, `409` ya había ingresado (con la hora) |
+| POST   | `/api/eventos/:id/checkin/alta`    | Alta en la puerta: `{ nombreApellido, acompanaA, empresa?, dni?, clave }` → `201`, `200` reintento, `409` ya estaba cargado (con sus datos) |
+| GET    | `/api/eventos/:id/checkin/qr?codigo=` | Invitado de un QR leído → `200`, `404` desconocido, `409` es de otro evento |
+| GET    | `/api/eventos/:id/qr`              | ZIP con los QR de la lista y `codigos.xlsx`                     |
+| GET    | `/api/eventos/:id/invitados/:invId/qr` | PNG del QR de un invitado                                   |
+| GET    | `/api/eventos/:id/exportar?lista=presentes\|todos` | Excel de presentes o de todos los invitados        |
 | GET    | `/api/salud`                       | Healthcheck                                                     |
 
 La búsqueda `q` encuentra palabras en cualquier orden ("Pérez Juan" encuentra a "Juan Pérez") y busca
@@ -194,16 +219,31 @@ src/
   db/               esquema Drizzle y conexión a Postgres
   lib/
     auth/           roles y permisos, contraseñas, sesiones, usuarios
-    checkin/        registro de ingresos
+    checkin/        registro de ingresos y alta en la puerta
+    qr/             generación y lectura de códigos QR
+    exportar/       Excel de presentes y de invitados
     panel/          métricas del panel en vivo
     eventos/        eventos y rubros
     importacion/    lectura del Excel, validación, importación
     invitados/      constantes, normalización, consultas
 drizzle/            migraciones SQL (versionadas)
 scripts/            migraciones en el deploy y generación de Excels
-tests/              tests de validación, importación, login, check-in, panel y gestión
+tests/              tests de validación, importación, login, check-in, panel, gestión, QR y exportación
 ejemplos/           Excel de prueba
+docs/               propuesta técnica y guion del video demo
 ```
+
+## Docker
+
+```bash
+docker compose up -d --build     # Postgres + la app en http://localhost:3000
+docker compose exec app npm run usuario:crear -- --usuario admin --nombre "Nombre Apellido" --rol admin
+```
+
+La imagen (`Dockerfile`, Node 24 Alpine, usuario sin privilegios) aplica las migraciones al arrancar y
+tiene healthcheck en `/api/salud`. Variables opcionales: `POSTGRES_PASSWORD`, `PUERTO_APP` (3000),
+`PUERTO_POSTGRES` (5432), `COOKIE_SECURE` (`true`; `false` solo para usarlo por `http://` en la red local).
+Sin HTTPS adelante, el navegador no guarda la cookie de sesión salvo en `localhost`.
 
 ## Deploy
 
@@ -216,4 +256,4 @@ cualquier entorno hace falta:
 4. Una vez: `npm run usuario:crear -- --usuario admin --nombre "..." --rol admin`.
 5. Servirlo por HTTPS (la cookie de sesión es `Secure`).
 
-`railway.json` deja configurado Railway con esos comandos para una demo.
+Con Docker, la imagen ya hace los pasos 2 y 3. `railway.json` deja configurado Railway para una demo.

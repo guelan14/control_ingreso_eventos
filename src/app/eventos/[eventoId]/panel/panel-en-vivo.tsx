@@ -11,12 +11,14 @@ export function PanelEnVivo({
   nombreEvento,
   usaRubros,
   usaPremiados,
+  puedeExportar,
   inicial,
 }: {
   eventoId: number;
   nombreEvento: string;
   usaRubros: boolean;
   usaPremiados: boolean;
+  puedeExportar: boolean;
   inicial: Panel;
 }) {
   const [panel, setPanel] = useState(inicial);
@@ -64,13 +66,23 @@ export function PanelEnVivo({
             Datos de las {hora} · se actualiza cada {SEGUNDOS_ACTUALIZACION} segundos
           </p>
         </div>
-        <button
-          onClick={actualizar}
-          disabled={estado === "actualizando"}
-          className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-        >
-          {estado === "actualizando" ? "Actualizando…" : "Actualizar ahora"}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {puedeExportar && (
+            <a
+              href={`/api/eventos/${eventoId}/exportar?lista=presentes`}
+              className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium"
+            >
+              Descargar presentes (Excel)
+            </a>
+          )}
+          <button
+            onClick={actualizar}
+            disabled={estado === "actualizando"}
+            className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          >
+            {estado === "actualizando" ? "Actualizando…" : "Actualizar ahora"}
+          </button>
+        </div>
       </div>
 
       {estado === "sin_conexion" && (
@@ -92,6 +104,9 @@ export function PanelEnVivo({
         <div className="rounded-xl bg-slate-900 p-5 text-white sm:col-span-2 lg:col-span-1">
           <p className="text-sm uppercase tracking-wide text-slate-300">Ingresaron</p>
           <p className="text-6xl font-black tabular-nums">{totales.ingresados}</p>
+          {totales.sinLista > 0 && (
+            <p className="text-sm text-slate-300">incluye {totales.sinLista} sin estar en la lista</p>
+          )}
         </div>
         <Indicador
           titulo="Sobre confirmados"
@@ -155,6 +170,9 @@ export function PanelEnVivo({
                     <span className="block truncate font-medium">{u.nombreApellido}</span>
                     <span className="block truncate text-sm text-slate-600">{u.empresa}</span>
                   </span>
+                  {u.origen === "puerta" && (
+                    <span className="rounded bg-slate-200 px-2 py-0.5 text-xs text-slate-700">sin lista</span>
+                  )}
                   {u.tipo === "correccion" && (
                     <span className="rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-900">corrección de hora</span>
                   )}

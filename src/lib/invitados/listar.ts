@@ -76,6 +76,8 @@ export async function listarInvitados(db: Db, eventoId: number, filtros: Filtros
         premiado: invitados.premiado,
         sector: invitados.sector,
         checkinEn: invitados.checkinEn,
+        origen: invitados.origen,
+        acompanaA: invitados.acompanaA,
       })
       .from(invitados)
       .leftJoin(rubros, eq(rubros.id, invitados.rubroId))

@@ -14,14 +14,17 @@ const contar = (condicion: ReturnType<typeof sql>) => sql<number>`count(*) filte
  */
 export async function obtenerPanel(db: Db, evento: EventoConRubros, ahora = new Date()): Promise<Panel> {
   const delEvento = eq(invitados.eventoId, evento.id);
-  const confirmado = sql`${invitados.confirmacion} = 'Confirmado'`;
+  // D7: quien llega sin estar en la lista suma a los ingresados, pero no a confirmados ni a invitaciones.
+  const deLista = sql`${invitados.origen} = 'lista'`;
+  const confirmado = sql`${deLista} and ${invitados.confirmacion} = 'Confirmado'`;
   const ingreso = sql`${invitados.checkinEn} is not null`;
 
   const [totales] = await db
     .select({
-      invitados: sql<number>`count(*)`.mapWith(Number),
+      invitados: contar(deLista),
       confirmados: contar(confirmado),
       ingresados: contar(ingreso),
+      sinLista: contar(sql`${invitados.origen} = 'puerta' and ${ingreso}`),
       faltan: contar(sql`${confirmado} and ${invitados.checkinEn} is null`),
       premiados: contar(sql`${invitados.premiado}`),
       premiadosIngresados: contar(sql`${invitados.premiado} and ${ingreso}`),
@@ -69,6 +72,7 @@ export async function obtenerPanel(db: Db, evento: EventoConRubros, ahora = new 
         premiado: invitados.premiado,
         tipo: checkins.tipo,
         registradoEn: checkins.registradoEn,
+        origen: invitados.origen,
       })
       .from(checkins)
       .innerJoin(invitados, eq(invitados.id, checkins.invitadoId))
@@ -92,6 +96,7 @@ export async function obtenerPanel(db: Db, evento: EventoConRubros, ahora = new 
       invitados: totales.invitados,
       confirmados: totales.confirmados,
       ingresados: totales.ingresados,
+      sinLista: totales.sinLista,
       faltan: totales.faltan,
     },
     premiados: {

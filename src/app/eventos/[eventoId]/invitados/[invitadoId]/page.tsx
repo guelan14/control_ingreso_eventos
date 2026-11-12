@@ -5,6 +5,7 @@ import { puede } from "@/lib/auth/roles";
 import { buscarEvento } from "@/lib/eventos/buscar";
 import { formatearFechaHora, formatearHoraExacta } from "@/lib/fechas";
 import { obtenerInvitado } from "@/lib/invitados/gestion";
+import { qrSvg } from "@/lib/qr/qr";
 import { FormularioEdicion } from "../formularios";
 
 export default async function DetalleInvitado({
@@ -20,6 +21,8 @@ export default async function DetalleInvitado({
   const invitado = await obtenerInvitado(db, evento.id, id);
   if (!invitado) notFound();
   const recienCreado = (await searchParams).creado === "1";
+  // Los de la puerta ya entraron: no necesitan QR.
+  const svg = puede(sesion.rol, "qr:generar") && invitado.origen === "lista" ? await qrSvg(invitado.codigo) : null;
 
   const dato = (titulo: string, valor: string | null) => (
     <div>
@@ -45,6 +48,9 @@ export default async function DetalleInvitado({
         {evento.usaPremiados && invitado.premiado && (
           <span className="rounded bg-red-600 px-2 py-0.5 text-sm font-bold text-white">PREMIADO</span>
         )}
+        {invitado.origen === "puerta" && (
+          <span className="rounded bg-slate-200 px-2 py-0.5 text-sm font-medium text-slate-800">Sin lista · alta en la puerta</span>
+        )}
       </div>
 
       <dl className="grid gap-4 rounded-lg border bg-white p-5 sm:grid-cols-3">
@@ -54,6 +60,7 @@ export default async function DetalleInvitado({
         {evento.usaRubros && dato("Rubro", invitado.rubro)}
         {dato("Confirmación", invitado.confirmacion)}
         {dato("Sector", invitado.sector)}
+        {invitado.acompanaA && dato("Acompaña a", invitado.acompanaA)}
         <div>
           <dt className="text-sm text-slate-500">Ingreso</dt>
           <dd className="font-medium">
@@ -66,6 +73,23 @@ export default async function DetalleInvitado({
           <dd className="text-xs text-slate-500">Solo se registra desde el check-in.</dd>
         </div>
       </dl>
+
+      {svg && (
+        <section className="flex flex-wrap items-center gap-5 rounded-lg border bg-white p-5">
+          {/* SVG armado en el servidor a partir de un código hexadecimal: no lleva texto cargado por usuarios. */}
+          <div className="w-36 shrink-0" dangerouslySetInnerHTML={{ __html: svg }} />
+          <div className="space-y-2">
+            <h2 className="font-semibold">Código QR</h2>
+            <p className="font-mono text-sm text-slate-600">{invitado.codigo}</p>
+            <a
+              href={`/api/eventos/${evento.id}/invitados/${invitado.id}/qr`}
+              className="inline-block rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-slate-50"
+            >
+              Descargar PNG
+            </a>
+          </div>
+        </section>
+      )}
 
       {puede(sesion.rol, "invitados:editar") && (
         <FormularioEdicion

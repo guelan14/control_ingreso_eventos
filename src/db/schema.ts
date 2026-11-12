@@ -50,6 +50,8 @@ export const rubros = pgTable(
   (t) => [uniqueIndex("rubros_evento_nombre_idx").on(t.eventoId, t.nombre)],
 );
 
+export const origenEnum = pgEnum("origen_invitado", ["lista", "puerta"]);
+
 export const invitados = pgTable(
   "invitados",
   {
@@ -70,6 +72,18 @@ export const invitados = pgTable(
     checkinEn: timestamp("checkin_en", { withTimezone: true }),
     /** nombre + empresa normalizados (sin tildes ni mayúsculas): para buscar y para identificar sin DNI. */
     claveNombre: text("clave_nombre").notNull(),
+    /** "lista": vino en el Excel o el alta manual. "puerta": llegó sin estar en la lista (D6). */
+    origen: origenEnum("origen").notNull().default("lista"),
+    /** Solo para altas en la puerta: a quién acompaña (premiado, cargo o vínculo familiar). */
+    acompanaA: text("acompana_a"),
+    /**
+     * Lo que lleva el QR del invitado. Aleatorio (64 bits) y no el id: con el id cualquiera podría
+     * fabricar el QR de otra persona. Lo genera la base, así también lo tienen los ya cargados.
+     */
+    codigo: text("codigo")
+      .notNull()
+      .unique()
+      .default(sql`upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 16))`),
     ...timestamps,
   },
   (t) => [

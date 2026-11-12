@@ -21,7 +21,10 @@ export default async function DetalleEvento({ params }: PageProps<"/eventos/[eve
     ...(puede(sesion.rol, "invitados:importar")
       ? [{ href: `/eventos/${evento.id}/importar`, titulo: "Importar invitados", detalle: "Excel con validación previa" }]
       : []),
-    { href: `/eventos/${evento.id}/invitados`, titulo: "Lista de invitados", detalle: "Buscar y filtrar" },
+    { href: `/eventos/${evento.id}/invitados`, titulo: "Lista de invitados", detalle: "Buscar, filtrar y exportar" },
+    ...(puede(sesion.rol, "qr:generar")
+      ? [{ href: `/eventos/${evento.id}/qr`, titulo: "Códigos QR", detalle: "Descargar en ZIP o imprimir tarjetas" }]
+      : []),
   ];
 
   return (

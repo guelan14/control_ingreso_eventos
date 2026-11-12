@@ -24,6 +24,10 @@ export const PERMISOS = {
   "checkin:registrar": ["admin", "organizador", "recepcion"],
   /** D3: los organizadores siguen los ingresos con nombres; en la puerta no se ve el panel. */
   "panel:ver": ["admin", "organizador"],
+  /** D11: la descarga de datos es solo para organizadores. */
+  "datos:exportar": ["admin", "organizador"],
+  /** D9: los organizadores generan y exportan los QR. */
+  "qr:generar": ["admin", "organizador"],
   "usuarios:gestionar": ["admin"],
 } as const satisfies Record<string, readonly Rol[]>;
 

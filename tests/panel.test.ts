@@ -60,7 +60,7 @@ beforeEach(async () => {
 describe("obtenerPanel", () => {
   it("sin ingresos: todos los premiados confirmados pendientes", async () => {
     const p = await obtenerPanel(db, evento);
-    expect(p.totales).toEqual({ invitados: 5, confirmados: 3, ingresados: 0, faltan: 3 });
+    expect(p.totales).toEqual({ invitados: 5, confirmados: 3, ingresados: 0, faltan: 3, sinLista: 0 });
     expect(p.premiados.total).toBe(3);
     expect(p.premiados.pendientes.map((x) => x.nombreApellido)).toEqual(["María González", "Sofía Benítez"]);
     expect(p.premiados.avisaronQueNoVienen.map((x) => x.nombreApellido)).toEqual(["Pedro Krause"]);
